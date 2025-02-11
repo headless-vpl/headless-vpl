@@ -13,6 +13,12 @@ export function getMousePosition(parent: HTMLElement): IPosition {
   return mousePosition
 }
 
+export function getPositionDelta(currentPosition: IPosition, previousPosition: IPosition) {
+  const dx = currentPosition.x - previousPosition.x
+  const dy = currentPosition.y - previousPosition.y
+  return { dx, dy }
+}
+
 //マウスの状態を取得（クリックしているかなど）
 type MouseState = {
   isLeftButtonDown: boolean
