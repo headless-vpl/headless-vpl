@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { Workspace, Position, Connector, Edge } from './lib/headless-vpl'
+import { Workspace, Position, Connector, Edge, getDistance } from './lib/headless-vpl'
 
 function App() {
   useEffect(() => {
@@ -37,7 +37,9 @@ function App() {
 
       edge.move(start, end)
 
-      
+      const distance = getDistance(edge.edgeData.start, connector.position)
+      console.log(distance)
+
       frame++
       requestAnimationFrame(animate)
     }
