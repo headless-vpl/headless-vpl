@@ -12,6 +12,7 @@ type ConnectorProps = {
 class Connector extends MovableObject {
   constructor({ workspace, position, name, type }: ConnectorProps) {
     super(workspace, position, name, type)
+    this.createDom()
   }
 
   public createDom(): void {

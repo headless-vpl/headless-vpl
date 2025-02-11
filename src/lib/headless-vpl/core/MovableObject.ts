@@ -22,9 +22,6 @@ export abstract class MovableObject {
 
     // ワークスペースに自身を登録（管理用）
     this.workspace.addElement(this)
-
-    // DOM 要素の生成
-    this.createDom()
   }
 
   /**

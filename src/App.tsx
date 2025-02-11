@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { Workspace, Position, Connector, Edge, getDistance } from './lib/headless-vpl'
+import { Workspace, Position, Connector, Edge, getDistance, Container } from './lib/headless-vpl'
 import { getMousePosition, getMouseState } from './lib/headless-vpl/util/mouse'
 
 function App() {
@@ -9,12 +9,9 @@ function App() {
 
     console.log(workspaceElement)
 
-    const position = new Position(100, 100)
-    console.log(position.getPosition())
-
     const connector = new Connector({
       workspace,
-      position,
+      position: new Position(100, 100),
       name: 'connector',
       type: 'input',
     })
@@ -22,14 +19,20 @@ function App() {
 
     const edge = new Edge({
       workspace,
-      start: position,
-      end: position,
+      start: new Position(100, 100),
+      end: new Position(100, 100),
+    })
+
+    const container = new Container({
+      workspace,
+      position: new Position(100, 100),
+      name: 'container',
     })
 
     const mousePosition = getMousePosition(workspaceElement)
-    
+
     const mouseState = getMouseState(workspaceElement, (newState) => {
-      console.log('mouseState changed:', newState)
+      // console.log('mouseState changed:', newState)
     })
 
     let frame = 0
@@ -44,9 +47,12 @@ function App() {
 
       edge.move(start, end)
 
-      // const distance = getDistance(edge.edgeData.start, connector.position)
-      // console.log(distance)
-
+      const distance = getDistance(mousePosition, container.position)
+      if (distance > 100) {
+        container.setColor('blue')
+      } else {
+        container.setColor('red')
+      }
       frame++
       requestAnimationFrame(animate)
     }
@@ -61,7 +67,7 @@ function App() {
       {/* workspace */}
       <div style={{ width: '500px', height: '500px', backgroundColor: 'white' }}>
         <svg id='workspace' style={{ width: '100%', height: '100%' }}>
-          <rect x='100' y='100' width='100' height='100' fill='blue' />
+          <rect x='100' y='100' width='100' height='100' fill='gray' />
         </svg>
       </div>
     </>
