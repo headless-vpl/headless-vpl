@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { Workspace, Position } from './lib/headless-vpl'
+import { Workspace, Position, Connector } from './lib/headless-vpl'
 
 function App() {
   useEffect(() => {
@@ -10,6 +10,25 @@ function App() {
 
     const position = new Position(100, 100)
     console.log(position.getPosition())
+
+    const connector = new Connector({
+      workspace,
+      position,
+      name: 'connector',
+      type: 'input',
+    })
+    console.log(connector)
+
+    let frame = 0
+    function animate() {
+      const x = Math.sin(frame / 20) * 2
+      const y = Math.cos(frame / 20) * 2
+      connector.move(connector.position.x + x, connector.position.y + 0)
+      frame++
+      requestAnimationFrame(animate)
+    }
+
+    animate()
   }, [])
 
   return (
