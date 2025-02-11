@@ -23,8 +23,9 @@ class Container extends MovableObject {
     const container = document.createElementNS('http://www.w3.org/2000/svg', 'rect')
     container.setAttribute('width', '100')
     container.setAttribute('height', '100')
+    container.setAttribute('stroke-width', '4')
     container.setAttribute('stroke', this.color)
-    console.log({ color: this.color })
+    container.setAttribute('fill', 'none')
 
     this.domElement = container
     this.workspace.getWorkspace().appendChild(this.domElement)

@@ -48,8 +48,8 @@ function App() {
       edge.move(start, end)
 
       const distance = getDistance(mousePosition, container.position)
-      if (distance > 100) {
-        container.setColor('blue')
+      if (distance > 50) {
+        container.setColor('green')
       } else {
         container.setColor('red')
       }
