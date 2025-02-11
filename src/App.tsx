@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { Workspace, Position, Connector, Edge, getDistance } from './lib/headless-vpl'
+import { getMousePosition, getMouseState } from './lib/headless-vpl/util/mouse'
 
 function App() {
   useEffect(() => {
@@ -25,20 +26,26 @@ function App() {
       end: position,
     })
 
+    const mousePosition = getMousePosition(workspaceElement)
+    
+    const mouseState = getMouseState(workspaceElement, (newState) => {
+      console.log('mouseState changed:', newState)
+    })
+
     let frame = 0
     function animate() {
       const x = Math.sin(frame / 20) * 50 + 100
       const y = Math.cos(frame / 20) * 50 + 100
 
-      connector.move(x, y)
+      connector.move(mousePosition.x, mousePosition.y)
 
-      const start = new Position(x, y)
+      const start = new Position(mousePosition.x, mousePosition.y)
       const end = new Position(100, 100)
 
       edge.move(start, end)
 
-      const distance = getDistance(edge.edgeData.start, connector.position)
-      console.log(distance)
+      // const distance = getDistance(edge.edgeData.start, connector.position)
+      // console.log(distance)
 
       frame++
       requestAnimationFrame(animate)
