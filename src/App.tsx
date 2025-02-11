@@ -28,6 +28,9 @@ function App() {
       workspace,
       position: new Position(100, 100),
       name: 'container',
+      color: 'red',
+      width: 200,
+      height: 70,
     })
 
     const mousePosition = getMousePosition(workspaceElement)
@@ -38,6 +41,7 @@ function App() {
     })
 
     let frame = 0
+    let drag = false
 
     function animate() {
       const { dx, dy } = getPositionDelta(mousePosition, previousMousePosition)
@@ -57,13 +61,17 @@ function App() {
       //   container.setColor('red')
       // }
 
-      //ドラッグ&ドロップ
-      if (isCollision(container, mousePosition)) {
+      //ドラッグ&ドロップ]
+      if (drag || isCollision(container, mousePosition)) {
         if (mouseState.isLeftButtonDown) {
+          drag = true
           container.setColor('red')
           container.move(container.position.x + dx, container.position.y + dy)
+        } else {
+          drag = false
         }
       } else {
+        drag = false
         container.setColor('green')
       }
 

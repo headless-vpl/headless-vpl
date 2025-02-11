@@ -6,6 +6,9 @@ type ContainerProps = {
   workspace: Workspace
   position: Position
   name: string
+  color?: string
+  width?: number
+  height?: number
 }
 
 class Container extends MovableObject {
@@ -13,11 +16,11 @@ class Container extends MovableObject {
   width: number
   height: number
 
-  constructor({ workspace, position, name }: ContainerProps) {
+  constructor({ workspace, position, name, color, width, height }: ContainerProps) {
     super(workspace, position, name, 'container')
-    this.color = 'red'
-    this.width = 100
-    this.height = 100
+    this.color = color || 'red'
+    this.width = width || 100
+    this.height = height || 100
     this.createDom()
 
     this.move(position.x, position.y)
