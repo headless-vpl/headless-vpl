@@ -2,5 +2,6 @@
 
 import Connector from './core/Connector'
 import Workspace from './core/Workspace'
+import Position from './core/Position'
 
-export { Connector, Workspace }
+export { Connector, Workspace, Position }

@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { Workspace } from './lib/headless-vpl'
+import { Workspace, Position } from './lib/headless-vpl'
 
 function App() {
   useEffect(() => {
@@ -7,6 +7,9 @@ function App() {
     const workspaceElement = workspace.getWorkspace()
 
     console.log(workspaceElement)
+
+    const position = new Position(100, 100)
+    console.log(position.getPosition())
   }, [])
 
   return (
