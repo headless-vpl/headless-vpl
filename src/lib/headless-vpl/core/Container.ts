@@ -1,3 +1,4 @@
+import { getPositionDelta } from '../util/mouse'
 import { MovableObject } from './MovableObject'
 import Position from './Position'
 import Workspace from './Workspace'
@@ -9,21 +10,25 @@ type ContainerProps = {
   color?: string
   width?: number
   height?: number
+  children?: { [key: string]: MovableObject }
 }
 
 class Container extends MovableObject {
   color: string
   width: number
   height: number
+  children: { [key: string]: MovableObject }
 
-  constructor({ workspace, position, name, color, width, height }: ContainerProps) {
+  constructor({ workspace, position, name, color, width, height, children }: ContainerProps) {
     super(workspace, position, name, 'container')
     this.color = color || 'red'
     this.width = width || 100
     this.height = height || 100
+    this.children = children || {}
     this.createDom()
 
     this.move(position.x, position.y)
+    this.updateChildren()
   }
 
   createDom(): void {
@@ -48,6 +53,27 @@ class Container extends MovableObject {
     this.color = color
     if (!this.domElement) return
     this.domElement.setAttribute('stroke', color)
+  }
+
+  updateChildren() {
+    for (const child of Object.values(this.children)) {
+      child.move(this.position.x + child.position.x, this.position.y + child.position.y)
+    }
+  }
+
+  //移動
+  move(x: number, y: number) {
+    //親の移動差分を計算
+    const previousPosition = this.position
+    const { dx, dy } = getPositionDelta(previousPosition, { x, y })
+
+    //親を移動する
+    super.move(x, y)
+
+    // 子要素は差分だけ移動させる
+    for (const child of Object.values(this.children)) {
+      child.move(child.position.x - dx, child.position.y - dy)
+    }
   }
 }
 

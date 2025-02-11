@@ -11,13 +11,19 @@ function App() {
 
     console.log(workspaceElement)
 
-    const connector = new Connector({
+    const connectorTop = new Connector({
       workspace,
-      position: new Position(100, 100),
-      name: 'connector',
+      position: new Position(50, 0),
+      name: 'connectorTop',
       type: 'input',
     })
-    console.log(connector)
+
+    const connectorBottom = new Connector({
+      workspace,
+      position: new Position(50, 70),
+      name: 'connectorBottom',
+      type: 'output',
+    })
 
     const edge = new Edge({
       workspace,
@@ -32,7 +38,13 @@ function App() {
       color: 'red',
       width: 200,
       height: 70,
+      children: {
+        connectorTop,
+        connectorBottom,
+      },
     })
+
+    
 
     const mousePosition = getMousePosition(workspaceElement)
     let previousMousePosition = { x: mousePosition.x, y: mousePosition.y }
@@ -47,21 +59,7 @@ function App() {
       const { dx, dy } = getPositionDelta(mousePosition, previousMousePosition)
       previousMousePosition = { x: mousePosition.x, y: mousePosition.y }
 
-      connector.move(mousePosition.x, mousePosition.y)
-
-      const start = new Position(mousePosition.x, mousePosition.y)
-      const end = new Position(100, 100)
-
-      edge.move(start, end)
-
-      // const distance = getDistance(mousePosition, container.position)
-      // if (distance > 50) {
-      //   container.setColor('green')
-      // } else {
-      //   container.setColor('red')
-      // }
-
-      //ドラッグ&ドロップ]
+      //ドラッグ&ドロップ
       if (drag || isCollision(container, mousePosition)) {
         if (mouseState.isLeftButtonDown) {
           drag = true
