@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { Workspace, Position, Connector, Edge, getDistance, Container } from './lib/headless-vpl'
 import { getMousePosition, getPositionDelta, getMouseState } from './lib/headless-vpl/util/mouse'
 import { isCollision } from './lib/headless-vpl/util/collision_detecion'
+import { animate } from './lib/headless-vpl/util/animate'
 
 function App() {
   useEffect(() => {
@@ -40,10 +41,9 @@ function App() {
       // console.log('mouseState changed:', newState)
     })
 
-    let frame = 0
     let drag = false
 
-    function animate() {
+    animate((deltaTime, frame) => {
       const { dx, dy } = getPositionDelta(mousePosition, previousMousePosition)
       previousMousePosition = { x: mousePosition.x, y: mousePosition.y }
 
@@ -74,12 +74,7 @@ function App() {
         drag = false
         container.setColor('green')
       }
-
-      frame++
-      requestAnimationFrame(animate)
-    }
-
-    animate()
+    })
   }, [])
 
   return (
