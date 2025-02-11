@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { Workspace, Position, Connector } from './lib/headless-vpl'
+import { Workspace, Position, Connector, Edge } from './lib/headless-vpl'
 
 function App() {
   useEffect(() => {
@@ -19,11 +19,25 @@ function App() {
     })
     console.log(connector)
 
+    const edge = new Edge({
+      workspace,
+      start: position,
+      end: position,
+    })
+
     let frame = 0
     function animate() {
-      const x = Math.sin(frame / 20) * 2
-      const y = Math.cos(frame / 20) * 2
-      connector.move(connector.position.x + x, connector.position.y + 0)
+      const x = Math.sin(frame / 20) * 50 + 100
+      const y = Math.cos(frame / 20) * 50 + 100
+
+      connector.move(x, y)
+
+      const start = new Position(x, y)
+      const end = new Position(100, 100)
+
+      edge.move(start, end)
+
+      
       frame++
       requestAnimationFrame(animate)
     }
