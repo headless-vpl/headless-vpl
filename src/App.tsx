@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { Workspace, Position, Connector, Edge, getDistance, Container } from './lib/headless-vpl'
 import { getMousePosition, getMouseState } from './lib/headless-vpl/util/mouse'
+import { isCollision } from './lib/headless-vpl/util/collision_detecion'
 
 function App() {
   useEffect(() => {
@@ -30,15 +31,19 @@ function App() {
     })
 
     const mousePosition = getMousePosition(workspaceElement)
+    let previousMousePosition = { x: mousePosition.x, y: mousePosition.y }
 
     const mouseState = getMouseState(workspaceElement, (newState) => {
       // console.log('mouseState changed:', newState)
     })
 
     let frame = 0
+
     function animate() {
-      const x = Math.sin(frame / 20) * 50 + 100
-      const y = Math.cos(frame / 20) * 50 + 100
+      const dx = mousePosition.x - previousMousePosition.x
+      const dy = mousePosition.y - previousMousePosition.y
+
+      previousMousePosition = { x: mousePosition.x, y: mousePosition.y }
 
       connector.move(mousePosition.x, mousePosition.y)
 
@@ -47,12 +52,23 @@ function App() {
 
       edge.move(start, end)
 
-      const distance = getDistance(mousePosition, container.position)
-      if (distance > 50) {
-        container.setColor('green')
+      // const distance = getDistance(mousePosition, container.position)
+      // if (distance > 50) {
+      //   container.setColor('green')
+      // } else {
+      //   container.setColor('red')
+      // }
+
+      //ドラッグ&ドロップ
+      if (isCollision(container, mousePosition)) {
+        if (mouseState.isLeftButtonDown) {
+          container.setColor('red')
+          container.move(container.position.x + dx, container.position.y + dy)
+        }
       } else {
-        container.setColor('red')
+        container.setColor('green')
       }
+
       frame++
       requestAnimationFrame(animate)
     }

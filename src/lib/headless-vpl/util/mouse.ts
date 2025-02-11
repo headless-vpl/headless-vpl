@@ -1,7 +1,7 @@
 import { IPosition } from '../core/Position'
 
 export function getMousePosition(parent: HTMLElement): IPosition {
-  const mousePosition = {
+  const mousePosition: IPosition = {
     x: 0,
     y: 0,
   }
