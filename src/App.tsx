@@ -50,7 +50,7 @@ function App() {
     const container2 = new Container({
       workspace,
       position: new Position(200, 0),
-      name: 'container',
+      name: 'container2',
       color: 'red',
       width: 200,
       height: 70,
@@ -73,7 +73,7 @@ function App() {
     const container3 = new Container({
       workspace,
       position: new Position(400, 220),
-      name: 'container',
+      name: 'container3',
       color: 'blue',
       width: 200,
       height: 70,
@@ -119,6 +119,8 @@ function App() {
     let dragContainers: Container[] = []
 
     let snapLocked = false
+    let hasFailed = false
+
     animate((dt, frame) => {
       const delta = getPositionDelta(mouseState.mousePosition, previousMousePosition)
       previousMousePosition = { x: mouseState.mousePosition.x, y: mouseState.mousePosition.y }
@@ -130,7 +132,16 @@ function App() {
         mouseState,
         dragEligible,
         dragContainers,
-        false
+        false,
+        () => {
+          //container2のChildrenも一緒に動かす
+          if (dragContainers.includes(container2)) {
+            if (container2.Children) {
+              const children = container2.Children
+              children.move(children.position.x + delta.x, children.position.y + delta.y)
+            }
+          }
+        }
       )
 
       // 必要に応じてエッジの接続更新などを実施
@@ -151,13 +162,24 @@ function App() {
           container.children.connectorTop.position, // ソースの位置
           container2.children.connectorBottom.position, // ターゲットの位置
           mouseState,
-          50
+          50,
+          () => {
+            console.log('snap')
+            container.Parent = container2
+            container2.Children = container
+            hasFailed = false // スナップ成功時にリセット
+          },
+          () => {
+            if (!hasFailed) {
+              console.log('snap failed')
+              container.Parent = null
+              container2.Children = null
+              hasFailed = true
+            }
+          }
         )
         if (snapped) snapLocked = true
       }
-
-      //グループで動かす
-      moveGroup(containers, delta)
     })
   }, [])
 

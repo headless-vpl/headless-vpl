@@ -10,6 +10,9 @@ type ConnectorProps = {
 }
 
 class Connector extends MovableObject {
+  public Parent: any
+  public Children: any
+  
   constructor({ workspace, position, name, type }: ConnectorProps) {
     super(workspace, position, name, type)
     this.createDom()

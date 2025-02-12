@@ -23,7 +23,8 @@ export function DragAndDrop(
   mouseState: getMouseState,
   dragEligible: boolean,
   currentDragContainers: Container[],
-  allowMultiple: boolean = false
+  allowMultiple: boolean = false,
+  callback?: () => void
 ): Container[] {
   // 現在のドラッグ中コンテナー配列をコピーして更新を行う
   let newDragContainers = [...currentDragContainers]
@@ -34,6 +35,7 @@ export function DragAndDrop(
         // 既にドラッグ中のコンテナーは移動＆赤色に更新
         container.setColor('red')
         container.move(container.position.x + delta.x, container.position.y + delta.y)
+        callback?.()
       } else if (isCollision(container, mouseState.mousePosition) && dragEligible) {
         if (!allowMultiple && newDragContainers.length > 0) {
           // 複数ドラッグが許可されていない場合、最初のコンテナのみをドラッグ
