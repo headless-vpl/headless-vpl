@@ -4,6 +4,7 @@ import { getMousePosition, getPositionDelta, getMouseState } from './lib/headles
 import { isCollision } from './lib/headless-vpl/util/collision_detecion'
 import { animate } from './lib/headless-vpl/util/animate'
 import { handleDragAndDropMulti } from './lib/headless-vpl/util/dnd'
+import { snapConnectors, MouseState } from './lib/headless-vpl/util/snap'
 
 function App() {
   useEffect(() => {
@@ -142,37 +143,16 @@ function App() {
         container2.children.connectorTop.position
       )
 
-      //snap機能の実装
-      /**
-       * 要件
-       * 指定した要素とのsnapを行う
-       *
-       * 条件
-       * 指定した条件（例：XとXとの距離がXX以下など）
-       *
-       * 引数
-       * @param 対象先、対象元
-       * @param 条件
-       * @param 条件に合致した場合の処理
-       */
-
-      //まずは手続き的に作ってみる
-      const source = container
-      const sourceConnector = source.children.connectorTop
-      
-      const target = container2
-      const targetConnector = target.children.connectorBottom
-
-      const snapDistance = 50
-      // snapLockedがfalseの場合 & マウスが離された場合
-      if (!snapLocked && mouseState.buttonState.leftButton === 'up') {
-        const distance = getDistance(sourceConnector.position, targetConnector.position)
-        if (distance < snapDistance) {
-          const delta = getPositionDelta(sourceConnector.position, targetConnector.position)
-          source.move(source.position.x - delta.x, source.position.y - delta.y)
-          snapLocked = true
-          console.log('snap')
-        }
+      // 汎用スナップ機能の利用例
+      if (!snapLocked) {
+        const snapped = snapConnectors(
+          container, // ソースコンテナ
+          container.children.connectorTop.position, // ソースのコネクタキー
+          container2.children.connectorBottom.position, // ターゲットのコネクタキー
+          mouseState,
+          50
+        )
+        if (snapped) snapLocked = true
       }
     })
   }, [])
