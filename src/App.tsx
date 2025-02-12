@@ -4,7 +4,7 @@ import { getMousePosition, getPositionDelta, getMouseState } from './lib/headles
 import { isCollision } from './lib/headless-vpl/util/collision_detecion'
 import { animate } from './lib/headless-vpl/util/animate'
 import { handleDragAndDropMulti } from './lib/headless-vpl/util/dnd'
-import { snapConnectors, MouseState } from './lib/headless-vpl/util/snap'
+import { snap } from './lib/headless-vpl/util/snap'
 
 function App() {
   useEffect(() => {
@@ -145,15 +145,17 @@ function App() {
 
       // 汎用スナップ機能の利用例
       if (!snapLocked) {
-        const snapped = snapConnectors(
+        const snapped = snap(
           container, // ソースコンテナ
-          container.children.connectorTop.position, // ソースのコネクタキー
-          container2.children.connectorBottom.position, // ターゲットのコネクタキー
+          container.children.connectorTop.position, // ソースの位置
+          container2.children.connectorBottom.position, // ターゲットの位置
           mouseState,
           50
         )
         if (snapped) snapLocked = true
       }
+
+      //グループで動かす
     })
   }, [])
 

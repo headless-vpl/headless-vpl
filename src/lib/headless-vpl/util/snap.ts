@@ -11,7 +11,7 @@ import { getMouseState, getPositionDelta } from './mouse'
  * @param snapDistance スナップを発動する距離の閾値
  * @returns スナップが実行された場合は true を返します。
  */
-export function snapConnectors(
+export function snap(
   source: Container,
   sourcePosition: Position,
   targetPosition: Position,
