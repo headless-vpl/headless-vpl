@@ -14,20 +14,22 @@ export function getMousePosition(parent: HTMLElement): IPosition {
 }
 
 export function getPositionDelta(currentPosition: IPosition, previousPosition: IPosition) {
-  const dx = currentPosition.x - previousPosition.x
-  const dy = currentPosition.y - previousPosition.y
-  return { dx, dy }
+  const delta: IPosition = {
+    x: currentPosition.x - previousPosition.x,
+    y: currentPosition.y - previousPosition.y,
+  }
+  return delta
 }
 
 //マウスの状態を取得（クリックしているかなど）
-type MouseState = {
+export type MouseState = {
   leftButton: 'down' | 'up'
 }
 
 //マウスの状態を取得する関数
 type getMouseStateProps = {
-  mousedown?: (mouseState: MouseState) => void
-  mouseup?: (mouseState: MouseState) => void
+  mousedown?: (mouseState: MouseState, mousePosition: IPosition) => void
+  mouseup?: (mouseState: MouseState, mousePosition: IPosition) => void
 }
 
 export function getMouseState(element: HTMLElement, handlers: getMouseStateProps) {
@@ -35,15 +37,26 @@ export function getMouseState(element: HTMLElement, handlers: getMouseStateProps
     leftButton: 'up',
   }
 
+  const mousePosition: IPosition = {
+    x: 0,
+    y: 0,
+  }
+
+  element.addEventListener('mousemove', (e) => {
+    const rect = element.getBoundingClientRect()
+    mousePosition.x = e.clientX - rect.left
+    mousePosition.y = e.clientY - rect.top
+  })
+
   element.addEventListener('mousedown', () => {
     mouseState.leftButton = 'down'
-    handlers.mousedown?.(mouseState)
+    handlers.mousedown?.(mouseState, mousePosition)
   })
 
   element.addEventListener('mouseup', () => {
     mouseState.leftButton = 'up'
-    handlers.mouseup?.(mouseState)
+    handlers.mouseup?.(mouseState, mousePosition)
   })
 
-  return mouseState
+  return { mouseState, mousePosition }
 }

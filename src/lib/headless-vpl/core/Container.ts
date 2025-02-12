@@ -57,7 +57,7 @@ class Container extends MovableObject {
 
   updateChildren() {
     for (const child of Object.values(this.children)) {
-      child.move(this.position.x + child.position.x, this.position.y + child.position.y)
+      child.move(this.position.x + child.position.x, this.position.y - child.position.y)
     }
   }
 
@@ -65,14 +65,14 @@ class Container extends MovableObject {
   move(x: number, y: number) {
     //親の移動差分を計算
     const previousPosition = this.position
-    const { dx, dy } = getPositionDelta(previousPosition, { x, y })
+    const delta = getPositionDelta(previousPosition, { x, y })
 
     //親を移動する
     super.move(x, y)
 
     // 子要素は差分だけ移動させる
     for (const child of Object.values(this.children)) {
-      child.move(child.position.x - dx, child.position.y - dy)
+      child.move(child.position.x - delta.x, child.position.y - delta.y)
     }
   }
 }

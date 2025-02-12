@@ -1,17 +1,22 @@
 import { useEffect } from 'react'
-import { Workspace, Position, Connector, Edge, getDistance, Container } from './lib/headless-vpl'
+import { Workspace, Position, Connector, Edge, Container } from './lib/headless-vpl'
 import { getMousePosition, getPositionDelta, getMouseState } from './lib/headless-vpl/util/mouse'
 import { isCollision } from './lib/headless-vpl/util/collision_detecion'
 import { animate } from './lib/headless-vpl/util/animate'
+import { handleDragAndDropMulti } from './lib/headless-vpl/util/dnd'
 
 function App() {
   useEffect(() => {
     const workspace = new Workspace('#workspace')
     const workspaceElement = workspace.getWorkspace()
 
-    console.log(workspaceElement)
-
     const edge = new Edge({
+      workspace,
+      start: new Position(100, 100),
+      end: new Position(100, 100),
+    })
+
+    const edge2 = new Edge({
       workspace,
       start: new Position(100, 100),
       end: new Position(100, 100),
@@ -33,7 +38,7 @@ function App() {
         }),
         connectorBottom: new Connector({
           workspace,
-          position: new Position(50, 70),
+          position: new Position(50, -70),
           name: 'connectorBottom',
           type: 'output',
         }),
@@ -56,63 +61,82 @@ function App() {
         }),
         connectorBottom: new Connector({
           workspace,
-          position: new Position(50, 70),
+          position: new Position(50, -70),
           name: 'connectorBottom',
           type: 'output',
         }),
       },
     })
 
-    const mousePosition = getMousePosition(workspaceElement)
-    let previousMousePosition = { x: mousePosition.x, y: mousePosition.y }
+    const container3 = new Container({
+      workspace,
+      position: new Position(200, 220),
+      name: 'container',
+      color: 'blue',
+      width: 200,
+      height: 70,
+      children: {
+        connectorLeft: new Connector({
+          workspace,
+          position: new Position(0, -35),
+          name: 'connectorLeft',
+          type: 'input',
+        }),
+        connectorRight: new Connector({
+          workspace,
+          position: new Position(200, -35),
+          name: 'connectorRight',
+          type: 'output',
+        }),
+      },
+    })
 
+    const containers = [container, container2, container3]
     const mouseState = getMouseState(workspaceElement, {
-      mousedown: (mouseState) => {
+      mousedown: (mouseState, mousePosition) => {
         if (mouseState.leftButton === 'down') {
-          // コンテナ上でクリックされたかどうかをチェック
-          dragEligible = [container, container2].some((instance) =>
-            isCollision(instance, mousePosition)
-          )
+          // コンテナ上でクリックされたかどうかをチェック（複数対象を一括で考慮）
+          dragEligible = containers.some((instance) => isCollision(instance, mousePosition))
         }
       },
       mouseup: () => {
         dragEligible = false
-        dragContainer = null
+        dragContainers = []
       },
     })
+
+    // 前フレームのマウス位置
+    let previousMousePosition = { x: 0, y: 0 }
 
     // クリック開始時にコンテナ上でクリックされたかを保持するフラグ
     let dragEligible = false
 
-    let dragContainer: Container | null = null
+    // 複数のコンテナーを管理するための配列
+    let dragContainers: Container[] = []
 
     animate((dt, frame) => {
-      const { dx, dy } = getPositionDelta(mousePosition, previousMousePosition)
-      previousMousePosition = { x: mousePosition.x, y: mousePosition.y }
+      const delta = getPositionDelta(mouseState.mousePosition, previousMousePosition)
+      previousMousePosition = { x: mouseState.mousePosition.x, y: mouseState.mousePosition.y }
 
-      // ドラッグ&ドロップ
-      for (const instance of [container, container2]) {
-        if (dragContainer === instance) {
-          if (mouseState.leftButton === 'down') {
-            instance.setColor('red')
-            instance.move(instance.position.x + dx, instance.position.y + dy)
-          } else {
-            dragContainer = null
-          }
-        } else if (
-          isCollision(instance, mousePosition) &&
-          mouseState.leftButton === 'down' &&
-          dragEligible
-        ) {
-          dragContainer = instance
-        } else {
-          instance.setColor('green')
-        }
-      }
+      //　複数containerをdnd
+      dragContainers = handleDragAndDropMulti(
+        containers,
+        delta,
+        mouseState,
+        dragEligible,
+        dragContainers,
+        false
+      )
 
+      // 必要に応じてエッジの接続更新などを実施
       edge.move(
         container2.children.connectorBottom.position,
         container.children.connectorTop.position
+      )
+
+      edge2.move(
+        container3.children.connectorLeft.position,
+        container2.children.connectorTop.position
       )
     })
   }, [])
@@ -120,9 +144,8 @@ function App() {
   return (
     <>
       <h1>Headless VPL</h1>
-
       {/* workspace */}
-      <div style={{ width: '500px', height: '500px', backgroundColor: 'white' }}>
+      <div style={{ width: '1200px', height: '700px', backgroundColor: 'white' }}>
         <svg id='workspace' style={{ width: '100%', height: '100%' }}>
           <rect x='100' y='100' width='100' height='100' fill='gray' />
         </svg>
