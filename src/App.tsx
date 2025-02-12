@@ -11,20 +11,6 @@ function App() {
 
     console.log(workspaceElement)
 
-    const connectorTop = new Connector({
-      workspace,
-      position: new Position(50, 0),
-      name: 'connectorTop',
-      type: 'input',
-    })
-
-    const connectorBottom = new Connector({
-      workspace,
-      position: new Position(50, 70),
-      name: 'connectorBottom',
-      type: 'output',
-    })
-
     const edge = new Edge({
       workspace,
       start: new Position(100, 100),
@@ -39,12 +25,43 @@ function App() {
       width: 200,
       height: 70,
       children: {
-        connectorTop,
-        connectorBottom,
+        connectorTop: new Connector({
+          workspace,
+          position: new Position(50, 0),
+          name: 'connectorTop',
+          type: 'input',
+        }),
+        connectorBottom: new Connector({
+          workspace,
+          position: new Position(50, 70),
+          name: 'connectorBottom',
+          type: 'output',
+        }),
       },
     })
 
-    
+    const container2 = new Container({
+      workspace,
+      position: new Position(100, 100),
+      name: 'container',
+      color: 'red',
+      width: 200,
+      height: 70,
+      children: {
+        connectorTop: new Connector({
+          workspace,
+          position: new Position(50, 0),
+          name: 'connectorTop',
+          type: 'input',
+        }),
+        connectorBottom: new Connector({
+          workspace,
+          position: new Position(50, 70),
+          name: 'connectorBottom',
+          type: 'output',
+        }),
+      },
+    })
 
     const mousePosition = getMousePosition(workspaceElement)
     let previousMousePosition = { x: mousePosition.x, y: mousePosition.y }
@@ -72,6 +89,10 @@ function App() {
         drag = false
         container.setColor('green')
       }
+      edge.move(
+        container2.children.connectorBottom.position,
+        container.children.connectorTop.position
+      )
     })
   }, [])
 
