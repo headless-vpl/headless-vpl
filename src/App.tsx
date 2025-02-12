@@ -3,8 +3,9 @@ import { Workspace, Position, Connector, Edge, Container, getDistance } from './
 import { getMousePosition, getPositionDelta, getMouseState } from './lib/headless-vpl/util/mouse'
 import { isCollision } from './lib/headless-vpl/util/collision_detecion'
 import { animate } from './lib/headless-vpl/util/animate'
-import { handleDragAndDropMulti } from './lib/headless-vpl/util/dnd'
+import { DragAndDrop } from './lib/headless-vpl/util/dnd'
 import { snap } from './lib/headless-vpl/util/snap'
+import { moveGroup } from './lib/headless-vpl/util/moveContainersGroup'
 
 function App() {
   useEffect(() => {
@@ -123,7 +124,7 @@ function App() {
       previousMousePosition = { x: mouseState.mousePosition.x, y: mouseState.mousePosition.y }
 
       //　複数containerをdnd
-      dragContainers = handleDragAndDropMulti(
+      dragContainers = DragAndDrop(
         containers,
         delta,
         mouseState,
@@ -156,6 +157,7 @@ function App() {
       }
 
       //グループで動かす
+      moveGroup(containers, delta)
     })
   }, [])
 

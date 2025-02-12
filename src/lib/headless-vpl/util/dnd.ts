@@ -17,7 +17,7 @@ import { getMouseState, MouseState } from './mouse'
  *
  * @returns 更新後のドラッグ中コンテナーの配列。ドラッグしていなければ空の配列を返します。
  */
-export function handleDragAndDropMulti(
+export function DragAndDrop(
   containers: Container[],
   delta: IPosition,
   mouseState: getMouseState,
