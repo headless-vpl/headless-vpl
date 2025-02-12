@@ -26,8 +26,8 @@ type MouseState = {
 
 //マウスの状態を取得する関数
 type getMouseStateProps = {
-  mousedown?: (newState: MouseState) => void
-  mouseup?: (newState: MouseState) => void
+  mousedown?: (mouseState: MouseState) => void
+  mouseup?: (mouseState: MouseState) => void
 }
 
 export function getMouseState(element: HTMLElement, handlers: getMouseStateProps) {
@@ -35,12 +35,12 @@ export function getMouseState(element: HTMLElement, handlers: getMouseStateProps
     leftButton: 'up',
   }
 
-  element.addEventListener('mousedown', (event) => {
+  element.addEventListener('mousedown', () => {
     mouseState.leftButton = 'down'
     handlers.mousedown?.(mouseState)
   })
 
-  element.addEventListener('mouseup', (event) => {
+  element.addEventListener('mouseup', () => {
     mouseState.leftButton = 'up'
     handlers.mouseup?.(mouseState)
   })

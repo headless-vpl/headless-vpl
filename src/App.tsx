@@ -67,15 +67,15 @@ function App() {
     let previousMousePosition = { x: mousePosition.x, y: mousePosition.y }
 
     const mouseState = getMouseState(workspaceElement, {
-      mousedown: (newState) => {
-        if (newState.leftButton === 'down') {
+      mousedown: (mouseState) => {
+        if (mouseState.leftButton === 'down') {
           // コンテナ上でクリックされたかどうかをチェック
           dragEligible = [container, container2].some((instance) =>
             isCollision(instance, mousePosition)
           )
         }
       },
-      mouseup: (newState) => {
+      mouseup: () => {
         dragEligible = false
         dragContainer = null
       },
@@ -86,7 +86,7 @@ function App() {
 
     let dragContainer: Container | null = null
 
-    animate((deltaTime, frame) => {
+    animate((dt, frame) => {
       const { dx, dy } = getPositionDelta(mousePosition, previousMousePosition)
       previousMousePosition = { x: mousePosition.x, y: mousePosition.y }
 
