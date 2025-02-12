@@ -1,7 +1,7 @@
 import Container from '../core/Container'
 import { IPosition } from '../core/Position'
 import { isCollision } from './collision_detecion'
-import { MouseState } from './mouse'
+import { getMouseState, MouseState } from './mouse'
 
 /**
  * 複数のコンテナーに対してドラッグ＆ドロップの更新を行います。
@@ -20,7 +20,7 @@ import { MouseState } from './mouse'
 export function handleDragAndDropMulti(
   containers: Container[],
   delta: IPosition,
-  mouseState: { mouseState: MouseState; mousePosition: IPosition },
+  mouseState: getMouseState,
   dragEligible: boolean,
   currentDragContainers: Container[],
   allowMultiple: boolean = false
@@ -28,7 +28,7 @@ export function handleDragAndDropMulti(
   // 現在のドラッグ中コンテナー配列をコピーして更新を行う
   let newDragContainers = [...currentDragContainers]
 
-  if (mouseState.mouseState.leftButton === 'down') {
+  if (mouseState.buttonState.leftButton === 'down') {
     containers.forEach((container) => {
       if (newDragContainers.includes(container)) {
         // 既にドラッグ中のコンテナーは移動＆赤色に更新

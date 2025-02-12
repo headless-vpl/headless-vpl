@@ -31,9 +31,12 @@ type getMouseStateProps = {
   mousedown?: (mouseState: MouseState, mousePosition: IPosition) => void
   mouseup?: (mouseState: MouseState, mousePosition: IPosition) => void
 }
-
-export function getMouseState(element: HTMLElement, handlers: getMouseStateProps) {
-  const mouseState: MouseState = {
+export type getMouseState = {
+  buttonState: MouseState
+  mousePosition: IPosition
+}
+export function getMouseState(element: HTMLElement, handlers: getMouseStateProps): getMouseState {
+  const buttonState: MouseState = {
     leftButton: 'up',
   }
 
@@ -49,14 +52,14 @@ export function getMouseState(element: HTMLElement, handlers: getMouseStateProps
   })
 
   element.addEventListener('mousedown', () => {
-    mouseState.leftButton = 'down'
-    handlers.mousedown?.(mouseState, mousePosition)
+    buttonState.leftButton = 'down'
+    handlers.mousedown?.(buttonState, mousePosition)
   })
 
   element.addEventListener('mouseup', () => {
-    mouseState.leftButton = 'up'
-    handlers.mouseup?.(mouseState, mousePosition)
+    buttonState.leftButton = 'up'
+    handlers.mouseup?.(buttonState, mousePosition)
   })
 
-  return { mouseState, mousePosition }
+  return { buttonState, mousePosition } as getMouseState
 }

@@ -78,9 +78,3 @@ class Container<T extends { [key: string]: MovableObject } = {}> extends Movable
 }
 
 export default Container
-
-function identity<T>(value: T): T {
-  return value
-}
-
-const num = identity("heoo")
