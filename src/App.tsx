@@ -138,6 +138,26 @@ function App() {
         container3.children.connectorLeft.position,
         container2.children.connectorTop.position
       )
+
+      //snap機能の実装
+      /**
+       * 要件
+       * 指定した要素とのsnapを行う
+       * 
+       * 条件
+       * 指定した条件（例：XとXとの距離がXX以下など）
+       * 
+       * 引数
+       * @param 対象先、対象元
+       * @param 条件
+       * @param 条件に合致した場合の処理
+       */
+
+      //まずは手続き的に作ってみる
+      if (container.children) {
+        
+      }
+
     })
   }, [])
 

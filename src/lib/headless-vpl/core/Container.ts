@@ -3,28 +3,28 @@ import { MovableObject } from './MovableObject'
 import Position from './Position'
 import Workspace from './Workspace'
 
-type ContainerProps = {
+type ContainerProps<T extends { [key: string]: MovableObject } = {}> = {
   workspace: Workspace
   position: Position
   name: string
   color?: string
   width?: number
   height?: number
-  children?: { [key: string]: MovableObject }
+  children?: T
 }
 
-class Container extends MovableObject {
+class Container<T extends { [key: string]: MovableObject } = {}> extends MovableObject {
   color: string
   width: number
   height: number
-  children: { [key: string]: MovableObject }
+  children: T //childrenの型をTにする
 
-  constructor({ workspace, position, name, color, width, height, children }: ContainerProps) {
+  constructor({ workspace, position, name, color, width, height, children }: ContainerProps<T>) {
     super(workspace, position, name, 'container')
     this.color = color || 'red'
     this.width = width || 100
     this.height = height || 100
-    this.children = children || {}
+    this.children = children || ({} as T) //childrenの型をTにする
     this.createDom()
 
     this.move(position.x, position.y)
@@ -78,3 +78,9 @@ class Container extends MovableObject {
 }
 
 export default Container
+
+function identity<T>(value: T): T {
+  return value
+}
+
+const num = identity("heoo")
