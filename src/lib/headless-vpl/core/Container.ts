@@ -19,9 +19,6 @@ class Container<T extends { [key: string]: MovableObject } = {}> extends Movable
   height: number
   children: T //childrenの型をTにする
 
-  public Parent: any
-  public Children: any
-
   constructor({ workspace, position, name, color, width, height, children }: ContainerProps<T>) {
     super(workspace, position, name, 'container')
     this.color = color || 'red'

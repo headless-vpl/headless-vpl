@@ -5,6 +5,9 @@ import Workspace from './Workspace'
  * 動くオブジェクトに共通するプロパティ・処理をまとめた基底クラス
  */
 export abstract class MovableObject {
+  public Parent: any
+  public Children: any
+
   public workspace: Workspace
   public position: Position
   public name: string
