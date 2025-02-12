@@ -21,25 +21,29 @@ export function getPositionDelta(currentPosition: IPosition, previousPosition: I
 
 //マウスの状態を取得（クリックしているかなど）
 type MouseState = {
-  isLeftButtonDown: boolean
+  leftButton: 'down' | 'up'
 }
-export function getMouseState(
-  parent: HTMLElement,
-  callback: (newState: MouseState) => void
-): MouseState {
+
+//マウスの状態を取得する関数
+type getMouseStateProps = {
+  mousedown?: (newState: MouseState) => void
+  mouseup?: (newState: MouseState) => void
+}
+
+export function getMouseState(element: HTMLElement, handlers: getMouseStateProps) {
   const mouseState: MouseState = {
-    isLeftButtonDown: false,
+    leftButton: 'up',
   }
 
-  function updateMouseState(e: MouseEvent, isDown: boolean) {
-    if (e.button === 0) {
-      mouseState.isLeftButtonDown = isDown
-    }
-    callback(mouseState)
-  }
+  element.addEventListener('mousedown', (event) => {
+    mouseState.leftButton = 'down'
+    handlers.mousedown?.(mouseState)
+  })
 
-  parent.addEventListener('mousedown', (e) => updateMouseState(e, true))
-  parent.addEventListener('mouseup', (e) => updateMouseState(e, false))
+  element.addEventListener('mouseup', (event) => {
+    mouseState.leftButton = 'up'
+    handlers.mouseup?.(mouseState)
+  })
 
   return mouseState
 }

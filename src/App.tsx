@@ -42,7 +42,7 @@ function App() {
 
     const container2 = new Container({
       workspace,
-      position: new Position(100, 100),
+      position: new Position(100, 0),
       name: 'container',
       color: 'red',
       width: 200,
@@ -66,29 +66,50 @@ function App() {
     const mousePosition = getMousePosition(workspaceElement)
     let previousMousePosition = { x: mousePosition.x, y: mousePosition.y }
 
-    const mouseState = getMouseState(workspaceElement, (newState) => {
-      // console.log('mouseState changed:', newState)
+    const mouseState = getMouseState(workspaceElement, {
+      mousedown: (newState) => {
+        if (newState.leftButton === 'down') {
+          // コンテナ上でクリックされたかどうかをチェック
+          dragEligible = [container, container2].some((instance) =>
+            isCollision(instance, mousePosition)
+          )
+        }
+      },
+      mouseup: (newState) => {
+        dragEligible = false
+        dragContainer = null
+      },
     })
 
-    let drag = false
+    // クリック開始時にコンテナ上でクリックされたかを保持するフラグ
+    let dragEligible = false
+
+    let dragContainer: Container | null = null
 
     animate((deltaTime, frame) => {
       const { dx, dy } = getPositionDelta(mousePosition, previousMousePosition)
       previousMousePosition = { x: mousePosition.x, y: mousePosition.y }
 
-      //ドラッグ&ドロップ
-      if (drag || isCollision(container, mousePosition)) {
-        if (mouseState.isLeftButtonDown) {
-          drag = true
-          container.setColor('red')
-          container.move(container.position.x + dx, container.position.y + dy)
+      // ドラッグ&ドロップ
+      for (const instance of [container, container2]) {
+        if (dragContainer === instance) {
+          if (mouseState.leftButton === 'down') {
+            instance.setColor('red')
+            instance.move(instance.position.x + dx, instance.position.y + dy)
+          } else {
+            dragContainer = null
+          }
+        } else if (
+          isCollision(instance, mousePosition) &&
+          mouseState.leftButton === 'down' &&
+          dragEligible
+        ) {
+          dragContainer = instance
         } else {
-          drag = false
+          instance.setColor('green')
         }
-      } else {
-        drag = false
-        container.setColor('green')
       }
+
       edge.move(
         container2.children.connectorBottom.position,
         container.children.connectorTop.position
