@@ -66,12 +66,12 @@ class Container<
   updateChildren() {
     for (const child of Object.values(this.children)) {
       //子要素がMovableObjectの場合
-      if (child instanceof Container || child instanceof Connector) {
+      if (this.isMovableObject(child)) {
         child.move(this.position.x + child.position.x, this.position.y - child.position.y)
       }
 
       //子要素がAutoLayoutの場合、親Containerを自動的にセットする
-      if (child instanceof AutoLayout) {
+      if (this.isAutoLayout(child)) {
         child.setParent(this)
         child.update()
         console.log(child.parentContainer)
@@ -91,16 +91,24 @@ class Container<
     // 子要素は型に応じて差分だけ移動または更新を行う
     for (const child of Object.values(this.children)) {
       //子要素がMovableObjectの場合
-      if (child instanceof Container || child instanceof Connector) {
+      if (this.isMovableObject(child)) {
         child.move(child.position.x - delta.x, child.position.y - delta.y)
       }
 
       //子要素がAutoLayoutの場合
-      if (child instanceof AutoLayout) {
+      if (this.isAutoLayout(child)) {
         child.update()
         console.log(child.parentContainer)
       }
     }
+  }
+
+  private isMovableObject(child: any): child is MovableObject {
+    return child instanceof MovableObject
+  }
+
+  private isAutoLayout(child: any): child is AutoLayout {
+    return child instanceof AutoLayout
   }
 }
 
