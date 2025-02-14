@@ -1,9 +1,11 @@
 import { getPositionDelta } from '../util/mouse'
+import AutoLayout from './AutoLayout'
+import Connector from './Connector'
 import { MovableObject } from './MovableObject'
 import Position from './Position'
 import Workspace from './Workspace'
 
-type ContainerProps<T extends { [key: string]: MovableObject } = {}> = {
+type ContainerProps<T extends { [key: string]: MovableObject | AutoLayout } = {}> = {
   workspace: Workspace
   position: Position
   name: string
@@ -13,7 +15,9 @@ type ContainerProps<T extends { [key: string]: MovableObject } = {}> = {
   children?: T
 }
 
-class Container<T extends { [key: string]: MovableObject } = {}> extends MovableObject {
+class Container<
+  T extends { [key: string]: MovableObject | AutoLayout } = {}
+> extends MovableObject {
   color: string
   width: number
   height: number
@@ -36,6 +40,8 @@ class Container<T extends { [key: string]: MovableObject } = {}> extends Movable
     container.setAttribute('width', `${this.width}`)
     container.setAttribute('height', `${this.height}`)
     container.setAttribute('stroke-width', '4')
+    container.setAttribute('rx', '10')
+    container.setAttribute('ry', '10')
     container.setAttribute('stroke', this.color)
     container.setAttribute('fill', 'none')
 
@@ -47,6 +53,8 @@ class Container<T extends { [key: string]: MovableObject } = {}> extends Movable
     if (!this.domElement) return
     this.domElement.setAttribute('x', `${this.position.x}`)
     this.domElement.setAttribute('y', `${this.position.y}`)
+    this.domElement.setAttribute('width', `${this.width}`)
+    this.domElement.setAttribute('height', `${this.height}`)
   }
 
   setColor(color: string) {
@@ -57,22 +65,41 @@ class Container<T extends { [key: string]: MovableObject } = {}> extends Movable
 
   updateChildren() {
     for (const child of Object.values(this.children)) {
-      child.move(this.position.x + child.position.x, this.position.y - child.position.y)
+      //子要素がMovableObjectの場合
+      if (child instanceof Container || child instanceof Connector) {
+        child.move(this.position.x + child.position.x, this.position.y - child.position.y)
+      }
+
+      //子要素がAutoLayoutの場合、親Containerを自動的にセットする
+      if (child instanceof AutoLayout) {
+        child.setParent(this)
+        child.update()
+        console.log(child.parentContainer)
+      }
     }
   }
 
   //移動
   move(x: number, y: number) {
-    //親の移動差分を計算
+    // 親の移動差分を計算
     const previousPosition = this.position
     const delta = getPositionDelta(previousPosition, { x, y })
 
-    //親を移動する
+    // 親を移動する
     super.move(x, y)
 
-    // 子要素は差分だけ移動させる
+    // 子要素は型に応じて差分だけ移動または更新を行う
     for (const child of Object.values(this.children)) {
-      child.move(child.position.x - delta.x, child.position.y - delta.y)
+      //子要素がMovableObjectの場合
+      if (child instanceof Container || child instanceof Connector) {
+        child.move(child.position.x - delta.x, child.position.y - delta.y)
+      }
+
+      //子要素がAutoLayoutの場合
+      if (child instanceof AutoLayout) {
+        child.update()
+        console.log(child.parentContainer)
+      }
     }
   }
 }

@@ -1,6 +1,7 @@
-import Connector from "./Connector"
+import Connector from './Connector'
+import AutoLayout from './AutoLayout'
 
-type Element = Connector
+type Element = Connector | AutoLayout
 
 class Workspace {
   private workspace: HTMLElement
@@ -10,7 +11,7 @@ class Workspace {
     this.workspace = document.querySelector(workspaceId) as HTMLElement
   }
 
-  public addElement(element: Connector) {
+  public addElement(element: Element) {
     this.elements.push(element)
   }
 
