@@ -1,6 +1,5 @@
 import { getPositionDelta } from '../util/mouse'
 import AutoLayout from './AutoLayout'
-import Connector from './Connector'
 import { MovableObject } from './MovableObject'
 import Position from './Position'
 import Workspace from './Workspace'
@@ -65,48 +64,60 @@ class Container<
 
   updateChildren() {
     for (const child of Object.values(this.children)) {
-      //子要素がMovableObjectの場合
-      if (this.isMovableObject(child)) {
-        child.move(this.position.x + child.position.x, this.position.y - child.position.y)
-      }
+      this.updateChildPosition(child)
+      this.updateChildLayout(child)
+    }
+  }
 
-      //子要素がAutoLayoutの場合、親Containerを自動的にセットする
-      if (this.isAutoLayout(child)) {
-        child.setParent(this)
-        child.update()
-        console.log(child.parentContainer)
-      }
+  //子要素を同じように移動させる
+  private updateChildPosition(child: MovableObject | AutoLayout) {
+    if (this.isMovableObject(child)) {
+      child.move(this.position.x + child.position.x, this.position.y - child.position.y)
+    }
+  }
+
+  //子要素（AutoLayout）を更新する
+  private updateChildLayout(child: MovableObject | AutoLayout) {
+    if (this.isAutoLayout(child)) {
+      child.setParent(this)
+      child.update()
+      console.log(child.parentContainer)
     }
   }
 
   //移動
   move(x: number, y: number) {
-    // 親の移動差分を計算
-    const previousPosition = this.position
-    const delta = getPositionDelta(previousPosition, { x, y })
-
-    // 親を移動する
+    const delta = this.calculatePositionDelta(x, y)
     super.move(x, y)
 
-    // 子要素は型に応じて差分だけ移動または更新を行う
+    //子要素の移動処理
+    this.updateChildrenPosition(delta)
+  }
+
+  //子要素の移動処理
+  private updateChildrenPosition(delta: { x: number; y: number }) {
     for (const child of Object.values(this.children)) {
-      //子要素がMovableObjectの場合
       if (this.isMovableObject(child)) {
         child.move(child.position.x - delta.x, child.position.y - delta.y)
-      }
-
-      //子要素がAutoLayoutの場合
-      if (this.isAutoLayout(child)) {
+      } else if (this.isAutoLayout(child)) {
         child.update()
         console.log(child.parentContainer)
       }
     }
   }
 
+  //親の移動差分を計算する
+  private calculatePositionDelta(x: number, y: number) {
+    const previousPosition = this.position
+    return getPositionDelta(previousPosition, { x, y })
+  }
+
+  //子要素がMovableObjectかどうかを判断する
   private isMovableObject(child: any): child is MovableObject {
     return child instanceof MovableObject
   }
 
+  //子要素がAutoLayoutかどうかを判断する
   private isAutoLayout(child: any): child is AutoLayout {
     return child instanceof AutoLayout
   }
