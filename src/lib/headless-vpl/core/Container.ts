@@ -6,7 +6,7 @@ import Workspace from './Workspace'
 
 type ContainerProps<T extends { [key: string]: MovableObject | AutoLayout } = {}> = {
   workspace: Workspace
-  position: Position
+  position?: Position
   name: string
   color?: string
   width?: number
@@ -22,7 +22,15 @@ class Container<
   height: number
   children: T //childrenの型をTにする
 
-  constructor({ workspace, position, name, color, width, height, children }: ContainerProps<T>) {
+  constructor({
+    workspace,
+    position = new Position(0, 0),
+    name,
+    color,
+    width,
+    height,
+    children,
+  }: ContainerProps<T>) {
     super(workspace, position, name, 'container')
     this.color = color || 'red'
     this.width = width || 100

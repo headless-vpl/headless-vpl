@@ -110,7 +110,6 @@ function App() {
           containers: [
             new Container({
               workspace,
-              position: new Position(0, 0),
               name: 'autoLayoutContainer',
               color: 'purple',
               width: 40,
@@ -118,7 +117,6 @@ function App() {
             }),
             new Container({
               workspace,
-              position: new Position(0, 0),
               name: 'autoLayoutContainer',
               color: 'purple',
               width: 80,
@@ -126,7 +124,6 @@ function App() {
             }),
             new Container({
               workspace,
-              position: new Position(0, 0),
               name: 'autoLayoutContainer',
               color: 'purple',
               width: 50,
@@ -134,7 +131,6 @@ function App() {
             }),
             new Container({
               workspace,
-              position: new Position(0, 0),
               name: 'autoLayoutContainer',
               color: 'purple',
               width: 20,
@@ -142,7 +138,6 @@ function App() {
             }),
             new Container({
               workspace,
-              position: new Position(0, 0),
               name: 'autoLayoutContainer',
               color: 'purple',
               width: 40,
