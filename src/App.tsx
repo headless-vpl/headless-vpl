@@ -6,6 +6,7 @@ import { animate } from './lib/headless-vpl/util/animate'
 import { DragAndDrop } from './lib/headless-vpl/util/dnd'
 import { snap } from './lib/headless-vpl/util/snap'
 import { moveGroup } from './lib/headless-vpl/util/moveContainersGroup'
+import AutoLayout from './lib/headless-vpl/core/AutoLayout'
 
 function App() {
   useEffect(() => {
@@ -93,7 +94,66 @@ function App() {
       },
     })
 
-    const containers = [container, container2, container3]
+    const autoLayoutContainer = new Container({
+      workspace,
+      position: new Position(300, 300),
+      name: 'autoLayoutContainer',
+      color: 'orange',
+      width: 300,
+      height: 120,
+      children: {
+        autoLayout: new AutoLayout({
+          workspace,
+          position: new Position(10, 10),
+          width: 280,
+          height: 100,
+          containers: [
+            new Container({
+              workspace,
+              position: new Position(0, 0),
+              name: 'autoLayoutContainer',
+              color: 'purple',
+              width: 40,
+              height: 40,
+            }),
+            new Container({
+              workspace,
+              position: new Position(0, 0),
+              name: 'autoLayoutContainer',
+              color: 'purple',
+              width: 80,
+              height: 40,
+            }),
+            new Container({
+              workspace,
+              position: new Position(0, 0),
+              name: 'autoLayoutContainer',
+              color: 'purple',
+              width: 50,
+              height: 40,
+            }),
+            new Container({
+              workspace,
+              position: new Position(0, 0),
+              name: 'autoLayoutContainer',
+              color: 'purple',
+              width: 20,
+              height: 40,
+            }),
+            new Container({
+              workspace,
+              position: new Position(0, 0),
+              name: 'autoLayoutContainer',
+              color: 'purple',
+              width: 40,
+              height: 40,
+            }),
+          ],
+        }),
+      },
+    })
+
+    const containers = [container, container2, container3, autoLayoutContainer]
     const mouseState = getMouseState(workspaceElement, {
       mousedown: (buttonState, mousePosition) => {
         if (buttonState.leftButton === 'down') {
