@@ -7,6 +7,7 @@ import { DragAndDrop } from './lib/headless-vpl/util/dnd'
 import { snap } from './lib/headless-vpl/util/snap'
 import { moveGroup } from './lib/headless-vpl/util/moveContainersGroup'
 import AutoLayout from './lib/headless-vpl/core/AutoLayout'
+import { DomController } from './lib/headless-vpl/util/domController'
 
 function App() {
   useEffect(() => {
@@ -50,7 +51,7 @@ function App() {
 
     const container2 = new Container({
       workspace,
-      position: new Position(200, 0),
+      position: new Position(200, 100),
       name: 'container2',
       color: 'red',
       width: 200,
@@ -73,7 +74,7 @@ function App() {
 
     const container3 = new Container({
       workspace,
-      position: new Position(400, 220),
+      position: new Position(400, 300),
       name: 'container3',
       color: 'blue',
       width: 200,
@@ -176,11 +177,15 @@ function App() {
     let snapLocked = false
     let hasFailed = false
 
+    const domController = new DomController('#node1')
+    const domController2 = new DomController('#node2')
+    const domController3 = new DomController('#node3')
+
     animate((dt, frame) => {
       const delta = getPositionDelta(mouseState.mousePosition, previousMousePosition)
       previousMousePosition = { x: mouseState.mousePosition.x, y: mouseState.mousePosition.y }
 
-      //　複数containerをdnd
+      // 複数containerをdnd
       dragContainers = DragAndDrop(
         containers,
         delta,
@@ -189,7 +194,7 @@ function App() {
         dragContainers,
         false,
         () => {
-          //container2のChildrenも一緒に動かす
+          // container2のChildrenも一緒に動かす
           if (dragContainers.includes(container2)) {
             if (container2.Children) {
               const children = container2.Children
@@ -235,6 +240,10 @@ function App() {
         )
         if (snapped) snapLocked = true
       }
+
+      domController.move(container.position.x, container.position.y)
+      domController2.move(container2.position.x, container2.position.y)
+      domController3.move(container3.position.x, container3.position.y)
     })
   }, [])
 
@@ -242,12 +251,75 @@ function App() {
     <>
       <h1>Headless VPL</h1>
       {/* workspace */}
-      <div style={{ width: '1200px', height: '700px', backgroundColor: 'white' }}>
-        <svg id='workspace' style={{ width: '100%', height: '100%' }}>
-          <rect x='100' y='100' width='100' height='100' fill='gray' />
-        </svg>
+      <div
+        style={{
+          width: '1200px',
+          height: '700px',
+          backgroundColor: 'rgb(244, 253, 255)',
+          position: 'relative',
+        }}
+      >
+        {/* Debug */}
+        <svg id='workspace' style={{ width: '100%', height: '100%', position: 'absolute' }}></svg>
+
+        {/* display */}
+        <div
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: '100%',
+            height: '100%',
+            pointerEvents: 'none',
+          }}
+        >
+          <Node id='node1' />
+          <Node id='node2' />
+          <Node id='node3' />
+        </div>
       </div>
     </>
+  )
+}
+
+const Node = ({ id }: { id: string }) => {
+  return (
+    <div
+      id={id}
+      style={{
+        cursor: 'grab',
+        position: 'absolute',
+        width: '200px',
+        height: '70px',
+        boxShadow: '0 12px 16px rgba(0, 0, 0, 0.2)',
+        borderRadius: '15px',
+        display: 'flex',
+        flexDirection: 'column',
+        background: 'linear-gradient(135deg, #667eea, rgb(255, 0, 234))',
+        alignItems: 'center',
+        justifyContent: 'center',
+        userSelect: 'none',
+      }}
+    >
+      <p style={{ color: 'white', fontWeight: 'bold', margin: 0 }}>ノード</p>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <input
+          type='text'
+          placeholder='入力'
+          style={{
+            borderRadius: '5px',
+            border: 'none',
+            width: '50%',
+            pointerEvents: 'auto',
+          }}
+        />
+        <label style={{ color: 'white', fontWeight: 'bold' }}>
+          <input type='checkbox' style={{ marginRight: '5px', pointerEvents: 'auto' }} />
+          トグル
+        </label>
+      </div>
+      <input type='range' name='' id='' style={{ pointerEvents: 'auto' }} />
+    </div>
   )
 }
 
