@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { Workspace, Position, Connector, Edge, Container, getDistance } from './lib/headless-vpl'
 import { getMousePosition, getPositionDelta, getMouseState } from './lib/headless-vpl/util/mouse'
 import { isCollision } from './lib/headless-vpl/util/collision_detecion'
@@ -26,9 +26,48 @@ function App() {
       end: new Position(100, 100),
     })
 
+    /**
+     * 宣言的UIを使った独自コンテナの作成
+     */
+
+    // const mitou = new Container({
+    //   workspace,
+    //   position: new Position(400, 40),
+    //   name: 'mitou',
+    //   color: 'blue',
+    //   width: 200,
+    //   height: 70,
+    //   children: {
+    //     connectorTop: new Connector({
+    //       workspace,
+    //       position: new Position(50, 0),
+    //       name: 'connectorTop',
+    //       type: 'input',
+    //     }),
+    //     connectorBottom: new Connector({
+    //       workspace,
+    //       position: new Position(50, -70),
+    //       name: 'connectorBottom',
+    //       type: 'output',
+    //     }),
+    //     connectorLeft: new Connector({
+    //       workspace,
+    //       position: new Position(0, -35),
+    //       name: 'connectorLeft',
+    //       type: 'input',
+    //     }),
+    //     connectorRight: new Connector({
+    //       workspace,
+    //       position: new Position(200, -35),
+    //       name: 'connectorRight',
+    //       type: 'output',
+    //     }),
+    //   },
+    // })
+
     const container = new Container({
       workspace,
-      position: new Position(100, 100),
+      position: new Position(100, 0),
       name: 'container',
       color: 'red',
       width: 200,
@@ -46,12 +85,27 @@ function App() {
           name: 'connectorBottom',
           type: 'output',
         }),
+        // test: new Container({
+        //   workspace,
+        //   position: new Position(50, -70),
+        //   name: 'test',
+        //   color: 'blue',
+        //   width: 200,
+        // }),
       },
     })
 
+    //**
+    // ノードのデモ
+    //  */
+
+    // const position = container.children.connectorBottom.position;
+    // alert(position.x)
+    
+
     const container2 = new Container({
       workspace,
-      position: new Position(200, 100),
+      position: new Position(200, 150),
       name: 'container2',
       color: 'red',
       width: 200,
@@ -97,7 +151,7 @@ function App() {
 
     const autoLayoutContainer = new Container({
       workspace,
-      position: new Position(300, 300),
+      position: new Position(600, 400),
       name: 'autoLayoutContainer',
       color: 'orange',
       width: 300,
@@ -273,7 +327,7 @@ function App() {
             pointerEvents: 'none',
           }}
         >
-          <Node id='node1' />
+          <ScratchLikeBlock id='node1' />
           <Node id='node2' />
           <Node id='node3' />
         </div>
@@ -322,5 +376,43 @@ const Node = ({ id }: { id: string }) => {
     </div>
   )
 }
-
+const ScratchLikeBlock = ({ id }: { id: string }) => {
+  return (
+    <div
+      id={id}
+      style={{
+        cursor: 'grab',
+        position: 'absolute',
+        width: '200px',
+        height: '70px',
+        boxShadow: '0 12px 16px rgba(0, 0, 0, 0.2)',
+        borderRadius: '15px',
+        display: 'flex',
+        flexDirection: 'column',
+        background: 'blue',
+        alignItems: 'center',
+        justifyContent: 'center',
+        userSelect: 'none',
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'left' }}>
+        <input
+          type='text'
+          placeholder='歩数'
+          style={{
+            borderRadius: '5px',
+            border: 'none',
+            margin: '5px',
+            padding: '5px',
+            backgroundColor: 'white',
+            width: '20%',
+            color: 'black',
+            pointerEvents: 'auto',
+          }}
+        />
+        <p style={{ color: 'white', fontWeight: 'bold' }}>歩動かす</p>
+      </div>
+    </div>
+  )
+}
 export default App
