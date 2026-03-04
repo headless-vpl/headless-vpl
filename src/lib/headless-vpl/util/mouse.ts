@@ -24,12 +24,13 @@ export function getPositionDelta(currentPosition: IPosition, previousPosition: I
 //マウスの状態を取得（クリックしているかなど）
 export type MouseState = {
   leftButton: 'down' | 'up'
+  middleButton: 'down' | 'up'
 }
 
 //マウスの状態を取得する関数
 type getMouseStateProps = {
-  mousedown?: (mouseState: MouseState, mousePosition: IPosition) => void
-  mouseup?: (mouseState: MouseState, mousePosition: IPosition) => void
+  mousedown?: (mouseState: MouseState, mousePosition: IPosition, event: MouseEvent) => void
+  mouseup?: (mouseState: MouseState, mousePosition: IPosition, event: MouseEvent) => void
 }
 export type getMouseState = {
   buttonState: MouseState
@@ -38,6 +39,7 @@ export type getMouseState = {
 export function getMouseState(element: HTMLElement, handlers: getMouseStateProps): getMouseState {
   const buttonState: MouseState = {
     leftButton: 'up',
+    middleButton: 'up',
   }
 
   const mousePosition: IPosition = {
@@ -51,14 +53,23 @@ export function getMouseState(element: HTMLElement, handlers: getMouseStateProps
     mousePosition.y = e.clientY - rect.top
   })
 
-  element.addEventListener('mousedown', () => {
-    buttonState.leftButton = 'down'
-    handlers.mousedown?.(buttonState, mousePosition)
+  element.addEventListener('mousedown', (e) => {
+    const tag = (e.target as HTMLElement).tagName
+    if (tag !== 'INPUT' && tag !== 'TEXTAREA' && tag !== 'SELECT') {
+      e.preventDefault()
+      if (document.activeElement instanceof HTMLElement) {
+        document.activeElement.blur()
+      }
+    }
+    if (e.button === 0) buttonState.leftButton = 'down'
+    if (e.button === 1) buttonState.middleButton = 'down'
+    handlers.mousedown?.(buttonState, mousePosition, e)
   })
 
-  element.addEventListener('mouseup', () => {
-    buttonState.leftButton = 'up'
-    handlers.mouseup?.(buttonState, mousePosition)
+  element.addEventListener('mouseup', (e) => {
+    if (e.button === 0) buttonState.leftButton = 'up'
+    if (e.button === 1) buttonState.middleButton = 'up'
+    handlers.mouseup?.(buttonState, mousePosition, e)
   })
 
   return { buttonState, mousePosition } as getMouseState

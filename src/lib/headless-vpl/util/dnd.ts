@@ -1,7 +1,7 @@
 import Container from '../core/Container'
 import { IPosition } from '../core/Position'
 import { isCollision } from './collision_detecion'
-import { getMouseState, MouseState } from './mouse'
+import { getMouseState } from './mouse'
 
 /**
  * 複数のコンテナーに対してドラッグ＆ドロップの更新を行います。
@@ -32,6 +32,10 @@ export function DragAndDrop(
   if (mouseState.buttonState.leftButton === 'down') {
     containers.forEach((container) => {
       if (newDragContainers.includes(container)) {
+        // 親もドラッグ中なら、親の move() が自動追従するのでスキップ
+        if (container.Parent && newDragContainers.includes(container.Parent as Container)) {
+          return
+        }
         // 既にドラッグ中のコンテナーは移動＆赤色に更新
         container.setColor('red')
         container.move(container.position.x + delta.x, container.position.y + delta.y)

@@ -1,59 +1,94 @@
-import Position from './Position'
+import type Connector from './Connector'
 import Workspace from './Workspace'
+import { generateId } from './types'
+import type { IEdge, EdgeType, EdgeMarker } from './types'
+import type { IPosition } from './Position'
+import { getStraightPath, getBezierPath, getStepPath, getSmoothStepPath } from '../util/edgePath'
+import type { EdgePathResult } from '../util/edgePath'
 
-interface EdgeData {
-  start: Position
-  end: Position
-  type: 'straight' | 'bezier'
+type EdgeProps = {
+  workspace?: Workspace
+  start: Connector
+  end: Connector
+  edgeType?: EdgeType
+  label?: string
+  markerStart?: EdgeMarker
+  markerEnd?: EdgeMarker
 }
 
-type Props = {
-  workspace: Workspace
-  start: Position
-  end: Position
-}
-
-class Edge {
-  public edgeData: EdgeData
+/**
+ * 2 つの Connector を結ぶ接続線。
+ * Position ではなく Connector への参照を保持し、
+ * Connector の移動に自動追従する（Renderer 側で処理）。
+ */
+class Edge implements IEdge {
+  readonly id: string
   public workspace: Workspace
-  public domElement: SVGElement | null = null
+  public startConnector: Connector
+  public endConnector: Connector
+  public edgeType: EdgeType
+  public label?: string
+  public markerStart?: EdgeMarker
+  public markerEnd?: EdgeMarker
 
-  constructor({ workspace, start, end }: Props) {
-    this.workspace = workspace
-    this.edgeData = {
-      start,
-      end,
-      type: 'straight',
+  constructor({ workspace, start, end, edgeType, label, markerStart, markerEnd }: EdgeProps) {
+    this.id = generateId('edge')
+    this.workspace = workspace ?? start.workspace
+    this.startConnector = start
+    this.endConnector = end
+    this.edgeType = edgeType ?? 'straight'
+    this.label = label
+    this.markerStart = markerStart
+    this.markerEnd = markerEnd
+    this.workspace.addEdge(this)
+  }
+
+  get startPosition() {
+    return this.startConnector.position
+  }
+
+  get endPosition() {
+    return this.endConnector.position
+  }
+
+  /**
+   * edgeType に応じたパス文字列とラベル位置を計算する。
+   */
+  computePath(): EdgePathResult {
+    const start: IPosition = { x: this.startPosition.x, y: this.startPosition.y }
+    const end: IPosition = { x: this.endPosition.x, y: this.endPosition.y }
+
+    switch (this.edgeType) {
+      case 'bezier':
+        return getBezierPath(start, end)
+      case 'step':
+        return getStepPath(start, end)
+      case 'smoothstep':
+        return getSmoothStepPath(start, end)
+      case 'straight':
+      default:
+        return getStraightPath(start, end)
     }
-
-    this.createDom()
   }
 
-  public update(): void {
-    if (!this.domElement) return
-    this.domElement.setAttribute('x1', `${this.edgeData.start.x}`)
-    this.domElement.setAttribute('y1', `${this.edgeData.start.y}`)
-    this.domElement.setAttribute('x2', `${this.edgeData.end.x}`)
-    this.domElement.setAttribute('y2', `${this.edgeData.end.y}`)
+  /**
+   * ラベルの表示位置を返す。
+   */
+  getLabelPosition(): IPosition {
+    return this.computePath().labelPosition
   }
 
-  public createDom(): void {
-    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line')
-    line.setAttribute('x1', `${this.edgeData.start.x}`)
-    line.setAttribute('y1', `${this.edgeData.start.y}`)
-    line.setAttribute('x2', `${this.edgeData.end.x}`)
-    line.setAttribute('y2', `${this.edgeData.end.y}`)
-    line.setAttribute('stroke', 'black')
-    line.setAttribute('stroke-width', '2')
-
-    this.domElement = line
-    this.workspace.getWorkspace().appendChild(this.domElement)
-  }
-
-  public move(start: Position, end: Position): void {
-    this.edgeData.start = start
-    this.edgeData.end = end
-    this.update()
+  public toJSON(): Record<string, unknown> {
+    return {
+      id: this.id,
+      type: 'edge',
+      edgeType: this.edgeType,
+      startConnectorId: this.startConnector.id,
+      endConnectorId: this.endConnector.id,
+      label: this.label,
+      markerStart: this.markerStart,
+      markerEnd: this.markerEnd,
+    }
   }
 }
 

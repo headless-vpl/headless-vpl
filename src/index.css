@@ -1,11 +1,17 @@
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
 :root {
   font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
   line-height: 1.5;
   font-weight: 400;
 
-  color-scheme: light dark;
-  color: rgba(255, 255, 255, 0.87);
-  background-color: #242424;
+  color-scheme: light;
+  color: #09090b;
+  background-color: #fafafa;
 
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -13,56 +19,303 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
-a {
-  font-weight: 500;
-  color: #646cff;
-  text-decoration: inherit;
-}
-a:hover {
-  color: #535bf2;
-}
-
 body {
   margin: 0;
   display: flex;
-  place-items: center;
+  flex-direction: column;
+  align-items: stretch;
   min-width: 320px;
   min-height: 100vh;
 }
 
 h1 {
-  font-size: 3.2em;
+  font-size: 1.5em;
   line-height: 1.1;
+  font-weight: 600;
+  letter-spacing: -0.02em;
 }
 
-button {
+/* ── App layout ── */
+.app {
+  padding: 16px 20px;
+  width: 100%;
+}
+
+.header {
+  margin-bottom: 12px;
+}
+
+/* ── Toolbar ── */
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  background: #f4f4f5;
+  border: 1px solid #e4e4e7;
   border-radius: 8px;
-  border: 1px solid transparent;
-  padding: 0.6em 1.2em;
-  font-size: 1em;
+  margin-bottom: 10px;
+}
+
+.toolbar button {
+  padding: 5px 10px;
+  border: 1px solid #d4d4d8;
+  border-radius: 6px;
+  background: #fff;
+  color: #09090b;
+  font-size: 12px;
   font-weight: 500;
   font-family: inherit;
-  background-color: #1a1a1a;
   cursor: pointer;
-  transition: border-color 0.25s;
-}
-button:hover {
-  border-color: #646cff;
-}
-button:focus,
-button:focus-visible {
-  outline: 4px auto -webkit-focus-ring-color;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  white-space: nowrap;
 }
 
-@media (prefers-color-scheme: light) {
-  :root {
-    color: #213547;
-    background-color: #ffffff;
-  }
-  a:hover {
-    color: #747bff;
-  }
-  button {
-    background-color: #f9f9f9;
-  }
+.toolbar button:hover:not(:disabled) {
+  background: #f4f4f5;
+}
+
+.toolbar button:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.toolbar button.active {
+  background: #18181b;
+  color: #fff;
+  border-color: #18181b;
+}
+
+.toolbar-sep {
+  width: 1px;
+  height: 20px;
+  background: #d4d4d8;
+  flex-shrink: 0;
+}
+
+/* ── Canvas ── */
+.canvas {
+  width: 100%;
+  height: calc(100vh - 200px);
+  background-color: #ffffff;
+  background-image: radial-gradient(circle, #d4d4d8 1px, transparent 1px);
+  background-size: 24px 24px;
+  position: relative;
+  overflow: hidden;
+  border-radius: 12px;
+  border: 1px solid #e4e4e7;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+}
+
+.workspace-svg {
+  width: 100%;
+  height: 100%;
+  position: absolute;
+}
+
+.dom-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+/* ── Flow node ── */
+.node-flow {
+  cursor: grab;
+  position: absolute;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: #fff;
+  border: 2px solid #e4e4e7;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  user-select: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.node-flow.selected {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.18);
+}
+
+/* ── Scratch block ── */
+.node-scratch {
+  cursor: grab;
+  position: absolute;
+  padding: 0 16px;
+  min-height: 60px;
+  white-space: nowrap;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #4f46e5, #7c3aed);
+  border: 2px solid rgba(255, 255, 255, 0.15);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+  user-select: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.node-scratch.selected {
+  border-color: rgba(255, 255, 255, 0.6);
+  box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.3);
+}
+
+/* Scratch block input */
+.node-scratch .scratch-input {
+  width: 30px;
+  background: rgba(255,255,255,0.2);
+  border: 1px solid rgba(255,255,255,0.3);
+  color: #fff;
+  pointer-events: auto;
+  font-size: inherit;
+  padding: 2px 4px;
+  border-radius: 4px;
+}
+
+/* Scratch block slot spacer */
+.node-scratch .scratch-slot-spacer {
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px dashed rgba(255, 255, 255, 0.3);
+  pointer-events: none;
+  min-width: 30px;
+}
+
+/* ── Resizable node ── */
+.node-resizable {
+  cursor: grab;
+  position: absolute;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  background: #ecfdf5;
+  border: 2px dashed #059669;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  user-select: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.node-resizable.selected {
+  border-color: #059669;
+  border-style: solid;
+  box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.2);
+}
+
+/* ── Node label ── */
+.node-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: #09090b;
+}
+
+/* ── Resize handles ── */
+.resize-handle {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  background: #059669;
+  border: 1px solid #fff;
+  pointer-events: none;
+}
+
+.rh-se { bottom: -4px; right: -4px; }
+.rh-sw { bottom: -4px; left: -4px; }
+.rh-ne { top: -4px; right: -4px; }
+.rh-nw { top: -4px; left: -4px; }
+
+/* ── Status bar ── */
+.status-bar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 6px 12px;
+  margin-top: 8px;
+  background: #f4f4f5;
+  border: 1px solid #e4e4e7;
+  border-radius: 8px;
+  font-size: 12px;
+  color: #71717a;
+}
+
+.status-hint {
+  margin-left: auto;
+  font-size: 11px;
+  color: #a1a1aa;
+}
+
+/* ── Input: text ── */
+input[type="text"] {
+  background: #fff;
+  border: 1px solid #e4e4e7;
+  border-radius: 6px;
+  color: #09090b;
+  padding: 4px 8px;
+  font-size: 12px;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+input[type="text"]::placeholder {
+  color: #a1a1aa;
+}
+
+input[type="text"]:focus {
+  border-color: #a1a1aa;
+  box-shadow: 0 0 0 2px rgba(9, 9, 11, 0.1);
+}
+
+/* ── Input: checkbox ── */
+input[type="checkbox"] {
+  accent-color: #18181b;
+  width: 14px;
+  height: 14px;
+  cursor: pointer;
+}
+
+/* ── Input: range ── */
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  border-radius: 2px;
+  background: #e4e4e7;
+  outline: none;
+  cursor: pointer;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #18181b;
+  border: 2px solid #fff;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.15s;
+}
+
+input[type="range"]::-webkit-slider-thumb:hover {
+  background: #09090b;
+  transform: scale(1.15);
+}
+
+input[type="range"]::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #18181b;
+  border: 2px solid #fff;
+  cursor: pointer;
 }

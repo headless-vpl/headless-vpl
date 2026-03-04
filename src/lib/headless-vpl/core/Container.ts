@@ -1,16 +1,24 @@
-import { getPositionDelta } from '../util/mouse'
 import AutoLayout from './AutoLayout'
 import { MovableObject } from './MovableObject'
 import Position from './Position'
 import Workspace from './Workspace'
+import type { SizingMode, Padding } from './types'
 
 type ContainerProps<T extends { [key: string]: MovableObject | AutoLayout } = {}> = {
-  workspace: Workspace
+  workspace?: Workspace
   position?: Position
   name: string
   color?: string
   width?: number
   height?: number
+  widthMode?: SizingMode
+  heightMode?: SizingMode
+  padding?: Partial<Padding>
+  minWidth?: number
+  maxWidth?: number
+  minHeight?: number
+  maxHeight?: number
+  resizable?: boolean
   children?: T
 }
 
@@ -20,7 +28,15 @@ class Container<
   color: string
   width: number
   height: number
-  children: T //childrenの型をTにする
+  widthMode: SizingMode
+  heightMode: SizingMode
+  padding: Padding
+  minWidth: number
+  maxWidth: number
+  minHeight: number
+  maxHeight: number
+  resizable: boolean
+  children: T
 
   constructor({
     workspace,
@@ -29,45 +45,90 @@ class Container<
     color,
     width,
     height,
+    widthMode,
+    heightMode,
+    padding,
+    minWidth,
+    maxWidth,
+    minHeight,
+    maxHeight,
+    resizable,
     children,
   }: ContainerProps<T>) {
     super(workspace, position, name, 'container')
     this.color = color || 'red'
     this.width = width || 100
     this.height = height || 100
-    this.children = children || ({} as T) //childrenの型をTにする
-    this.createDom()
+    this.widthMode = widthMode || 'fixed'
+    this.heightMode = heightMode || 'fixed'
+    this.padding = {
+      top: padding?.top ?? 0,
+      right: padding?.right ?? 0,
+      bottom: padding?.bottom ?? 0,
+      left: padding?.left ?? 0,
+    }
+    this.minWidth = minWidth ?? 0
+    this.maxWidth = maxWidth ?? Infinity
+    this.minHeight = minHeight ?? 0
+    this.maxHeight = maxHeight ?? Infinity
+    this.resizable = resizable ?? false
+    this.children = children || ({} as T)
 
-    this.move(position.x, position.y)
-    this.updateChildren()
+    if (this.workspace) {
+      this.propagateWorkspace(this.workspace)
+      this.workspace.addElement(this)
+      this.move(position.x, position.y)
+      this.updateChildren()
+    }
   }
 
-  createDom(): void {
-    const container = document.createElementNS('http://www.w3.org/2000/svg', 'rect')
-    container.setAttribute('width', `${this.width}`)
-    container.setAttribute('height', `${this.height}`)
-    container.setAttribute('stroke-width', '4')
-    container.setAttribute('rx', '10')
-    container.setAttribute('ry', '10')
-    container.setAttribute('stroke', this.color)
-    container.setAttribute('fill', 'none')
-
-    this.domElement = container
-    this.workspace.getWorkspace().appendChild(this.domElement)
+  private propagateWorkspace(ws: Workspace) {
+    for (const child of Object.values(this.children)) {
+      this.bindChildWorkspace(child, ws)
+    }
   }
 
-  update() {
-    if (!this.domElement) return
-    this.domElement.setAttribute('x', `${this.position.x}`)
-    this.domElement.setAttribute('y', `${this.position.y}`)
-    this.domElement.setAttribute('width', `${this.width}`)
-    this.domElement.setAttribute('height', `${this.height}`)
+  private bindChildWorkspace(child: MovableObject | AutoLayout, ws: Workspace) {
+    if (child.workspace) return
+
+    child.workspace = ws
+    ws.addElement(child)
+
+    if (child instanceof Container) {
+      for (const grandChild of Object.values(child.children) as (MovableObject | AutoLayout)[]) {
+        this.bindChildWorkspace(grandChild, ws)
+      }
+    } else if (child instanceof AutoLayout) {
+      for (const grandChild of child.Children) {
+        this.bindChildWorkspace(grandChild, ws)
+      }
+    }
   }
 
   setColor(color: string) {
     this.color = color
-    if (!this.domElement) return
-    this.domElement.setAttribute('stroke', color)
+    this.update()
+  }
+
+  applyContentSize(contentWidth: number, contentHeight: number): void {
+    let changed = false
+    if (this.widthMode === 'hug') {
+      const newWidth = Math.min(Math.max(contentWidth + this.padding.left + this.padding.right, this.minWidth), this.maxWidth)
+      if (this.width !== newWidth) {
+        this.width = newWidth
+        changed = true
+      }
+    }
+    if (this.heightMode === 'hug') {
+      const newHeight = Math.min(Math.max(contentHeight + this.padding.top + this.padding.bottom, this.minHeight), this.maxHeight)
+      if (this.height !== newHeight) {
+        this.height = newHeight
+        changed = true
+      }
+    }
+    if (changed) {
+      this.update()
+    }
   }
 
   updateChildren() {
@@ -77,58 +138,65 @@ class Container<
     }
   }
 
-  //子要素を同じように移動させる
   private updateChildPosition(child: MovableObject | AutoLayout) {
     if (this.isMovableObject(child)) {
       child.move(this.position.x + child.position.x, this.position.y - child.position.y)
     }
   }
 
-  //子要素（AutoLayout）を更新する
   private updateChildLayout(child: MovableObject | AutoLayout) {
     if (this.isAutoLayout(child)) {
       child.setParent(this)
       child.update()
-      console.log(child.parentContainer)
     }
   }
 
-  //移動
   move(x: number, y: number) {
-    const delta = this.calculatePositionDelta(x, y)
+    const dx = this.position.x - x
+    const dy = this.position.y - y
     super.move(x, y)
-
-    //子要素の移動処理
-    this.updateChildrenPosition(delta)
+    this.updateChildrenPosition({ x: dx, y: dy })
   }
 
-  //子要素の移動処理
   private updateChildrenPosition(delta: { x: number; y: number }) {
     for (const child of Object.values(this.children)) {
       if (this.isMovableObject(child)) {
         child.move(child.position.x - delta.x, child.position.y - delta.y)
       } else if (this.isAutoLayout(child)) {
         child.update()
-        console.log(child.parentContainer)
       }
     }
   }
 
-  //親の移動差分を計算する
-  private calculatePositionDelta(x: number, y: number) {
-    const previousPosition = this.position
-    return getPositionDelta(previousPosition, { x, y })
-  }
-
-  //子要素がMovableObjectかどうかを判断する
-  private isMovableObject(child: any): child is MovableObject {
+  private isMovableObject(child: unknown): child is MovableObject {
     return child instanceof MovableObject
   }
 
-  //子要素がAutoLayoutかどうかを判断する
-  private isAutoLayout(child: any): child is AutoLayout {
+  private isAutoLayout(child: unknown): child is AutoLayout {
     return child instanceof AutoLayout
   }
+
+  public override toJSON(): Record<string, unknown> {
+    return {
+      ...super.toJSON(),
+      color: this.color,
+      width: this.width,
+      height: this.height,
+      widthMode: this.widthMode,
+      heightMode: this.heightMode,
+      padding: this.padding,
+      children: Object.fromEntries(
+        Object.entries(this.children).map(([key, child]) => {
+          const c = child as MovableObject | AutoLayout
+          return [key, 'toJSON' in c ? (c as ISerializable).toJSON() : {}]
+        })
+      ),
+    }
+  }
+}
+
+interface ISerializable {
+  toJSON(): Record<string, unknown>
 }
 
 export default Container

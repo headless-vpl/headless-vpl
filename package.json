@@ -1,19 +1,44 @@
 {
-  "name": "headlessvpl",
-  "private": true,
-  "version": "0.0.0",
+  "name": "headless-vpl",
+  "version": "0.1.0",
   "type": "module",
+  "description": "A headless library for building visual programming languages",
+  "module": "./dist/headless-vpl.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/headless-vpl.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist",
+    "LICENSE",
+    "README.md"
+  ],
+  "license": "MIT",
+  "keywords": [
+    "visual-programming",
+    "vpl",
+    "headless",
+    "drag-and-drop",
+    "node-editor",
+    "block-programming"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/headless-vpl/headless-vpl"
+  },
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "build:lib": "vite build --config vite.lib.config.ts && tsc -p tsconfig.lib.json",
+    "prepublishOnly": "npm run build:lib",
     "lint": "eslint .",
     "preview": "vite preview"
   },
-  "dependencies": {
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0"
-  },
   "devDependencies": {
+    "@types/node": "^22.10.1",
     "@eslint/js": "^9.19.0",
     "@types/react": "^19.0.8",
     "@types/react-dom": "^19.0.3",
@@ -22,6 +47,8 @@
     "eslint-plugin-react-hooks": "^5.0.0",
     "eslint-plugin-react-refresh": "^0.4.18",
     "globals": "^15.14.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
     "typescript": "~5.7.2",
     "typescript-eslint": "^8.22.0",
     "vite": "^6.1.0"
