@@ -1,6 +1,6 @@
 {
   "name": "headless-vpl",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "type": "module",
   "description": "A headless library for building visual programming languages",
   "module": "./dist/headless-vpl.js",
