@@ -1,20 +1,20 @@
 import type Connector from '../core/Connector'
+import Edge from '../core/Edge'
 import type { IPosition } from '../core/Position'
 import type Workspace from '../core/Workspace'
 import type { EdgeType, IEdge } from '../core/types'
-import Edge from '../core/Edge'
 import { getDistance } from './distance'
-import { getBezierPath, getStraightPath, getStepPath, getSmoothStepPath } from './edgePath'
+import { getBezierPath, getSmoothStepPath, getStepPath, getStraightPath } from './edgePath'
 
 /**
  * コネクターがマウス位置のヒット範囲内かを判定する。
  */
 export function isConnectorHit(
   mousePos: IPosition,
-  connector: { position: IPosition },
-  hitRadius: number = 16
+  connector: { position: IPosition; hitRadius?: number },
+  hitRadius = 16
 ): boolean {
-  return getDistance(mousePos, connector.position) <= hitRadius
+  return getDistance(mousePos, connector.position) <= (connector.hitRadius ?? hitRadius)
 }
 
 /**
@@ -22,13 +22,14 @@ export function isConnectorHit(
  */
 export function findNearestConnector(
   mousePos: IPosition,
-  connectors: Array<{ position: IPosition }>,
-  hitRadius: number = 16
+  connectors: Array<{ position: IPosition; hitRadius?: number }>,
+  hitRadius = 16
 ): { connector: (typeof connectors)[number]; distance: number } | null {
   let best: { connector: (typeof connectors)[number]; distance: number } | null = null
   for (const connector of connectors) {
     const d = getDistance(mousePos, connector.position)
-    if (d <= hitRadius && (!best || d < best.distance)) {
+    const radius = connector.hitRadius ?? hitRadius
+    if (d <= radius && (!best || d < best.distance)) {
       best = { connector, distance: d }
     }
   }
@@ -50,7 +51,6 @@ export type EdgeBuilderConfig = {
  */
 export class EdgeBuilder {
   private workspace: Workspace
-  private hitRadius: number
   private edgeType: EdgeType
   private onPreview?: (path: string, from: IPosition, to: IPosition) => void
   private onComplete?: (edge: Edge) => void
@@ -62,7 +62,6 @@ export class EdgeBuilder {
 
   constructor(config: EdgeBuilderConfig) {
     this.workspace = config.workspace
-    this.hitRadius = config.hitRadius ?? 16
     this.edgeType = config.edgeType ?? 'bezier'
     this.onPreview = config.onPreview
     this.onComplete = config.onComplete
@@ -145,7 +144,6 @@ export class EdgeBuilder {
         return getStepPath(from, to).path
       case 'smoothstep':
         return getSmoothStepPath(from, to).path
-      case 'straight':
       default:
         return getStraightPath(from, to).path
     }
@@ -178,7 +176,7 @@ function pointToSegmentDist(
 export function findEdgeAtPoint(
   worldPos: IPosition,
   edges: readonly IEdge[],
-  hitDistance: number = 8
+  hitDistance = 8
 ): Edge | null {
   for (const edge of edges) {
     const e = edge as Edge

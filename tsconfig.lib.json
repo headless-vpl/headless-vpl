@@ -12,5 +12,5 @@
     "rootDir": "./src/lib/headless-vpl"
   },
   "include": ["src/lib/headless-vpl/**/*.ts"],
-  "exclude": ["node_modules", "dist"]
+  "exclude": ["node_modules", "dist", "**/*.test.ts"]
 }

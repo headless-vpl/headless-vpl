@@ -13,13 +13,7 @@ export type WheelZoomConfig = {
  * クリーンアップ関数を返す。
  */
 export function bindWheelZoom(element: HTMLElement, config: WheelZoomConfig): () => void {
-  const {
-    workspace,
-    minScale = 0.1,
-    maxScale = 5,
-    factor = 0.1,
-    onChange,
-  } = config
+  const { workspace, minScale = 0.1, maxScale = 5, factor = 0.1, onChange } = config
 
   const onWheel = (e: WheelEvent) => {
     e.preventDefault()

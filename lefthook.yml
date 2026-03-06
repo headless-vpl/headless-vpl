@@ -1,0 +1,13 @@
+pre-commit:
+  parallel: true
+  commands:
+    lint:
+      glob: "*.{ts,tsx,js,json}"
+      run: npx biome check {staged_files}
+    typecheck:
+      run: npm run typecheck
+
+pre-push:
+  commands:
+    test:
+      run: npm run test

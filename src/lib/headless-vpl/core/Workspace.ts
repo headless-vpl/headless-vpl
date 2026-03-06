@@ -1,7 +1,7 @@
 import { EventBus } from './EventBus'
 import { History } from './History'
 import { SelectionManager } from './SelectionManager'
-import type { IWorkspaceElement, IEdge, VplEventType, VplEvent, Viewport } from './types'
+import type { IEdge, IWorkspaceElement, Viewport, VplEvent, VplEventType } from './types'
 
 /**
  * 要素の管理と EventBus を提供するワークスペース。
@@ -61,7 +61,10 @@ class Workspace {
 
     // Edge を逆順に削除（splice 安全）
     const edgesToRemove = this._edges.filter((edge) => {
-      const e = edge as unknown as { startConnector?: { id: string }; endConnector?: { id: string } }
+      const e = edge as unknown as {
+        startConnector?: { id: string }
+        endConnector?: { id: string }
+      }
       return (
         (e.startConnector && childIds.has(e.startConnector.id)) ||
         (e.endConnector && childIds.has(e.endConnector.id))
@@ -72,14 +75,19 @@ class Workspace {
     }
 
     // Parent/Children 関係をクリア
-    const mo = element as unknown as { Parent?: { Children: unknown } | null; Children?: { Parent: unknown } | null }
+    const mo = element as unknown as {
+      Parent?: { Children: Set<unknown> } | null
+      Children?: Set<{ Parent: unknown }>
+    }
     if (mo.Parent) {
-      mo.Parent.Children = null
+      mo.Parent.Children.delete(mo)
       mo.Parent = null
     }
     if (mo.Children) {
-      mo.Children.Parent = null
-      mo.Children = null
+      for (const child of mo.Children) {
+        child.Parent = null
+      }
+      mo.Children.clear()
     }
 
     // 子要素を再帰的にワークスペースから除去
@@ -143,14 +151,17 @@ class Workspace {
    * scale は 1.0 を上限とし、過度なズームインを防止する。
    * canvasWidth/canvasHeight は引数で渡す（DOM 依存回避）。
    */
-  fitView(canvasWidth: number, canvasHeight: number, padding: number = 50): void {
+  fitView(canvasWidth: number, canvasHeight: number, padding = 50): void {
     const containers = this._elements.filter(
       (el) => 'width' in el && 'height' in el
     ) as (IWorkspaceElement & { width: number; height: number })[]
 
     if (containers.length === 0) return
 
-    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+    let minX = Number.POSITIVE_INFINITY
+    let minY = Number.POSITIVE_INFINITY
+    let maxX = Number.NEGATIVE_INFINITY
+    let maxY = Number.NEGATIVE_INFINITY
 
     for (const el of containers) {
       const x = el.position.x

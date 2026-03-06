@@ -27,8 +27,8 @@ export function computeAutoPan(
   mousePos: IPosition,
   bounds: CanvasBounds,
   isDragging: boolean,
-  threshold: number = 40,
-  speed: number = 10
+  threshold = 40,
+  speed = 10
 ): AutoPanResult {
   if (!isDragging) return { dx: 0, dy: 0, active: false }
 
@@ -42,7 +42,7 @@ export function computeAutoPan(
   }
 
   // 右端
-  const rightDist = (bounds.x + bounds.width) - mousePos.x
+  const rightDist = bounds.x + bounds.width - mousePos.x
   if (rightDist < threshold && rightDist >= 0) {
     dx = -speed * (1 - rightDist / threshold)
   }
@@ -54,7 +54,7 @@ export function computeAutoPan(
   }
 
   // 下端
-  const bottomDist = (bounds.y + bounds.height) - mousePos.y
+  const bottomDist = bounds.y + bounds.height - mousePos.y
   if (bottomDist < threshold && bottomDist >= 0) {
     dy = -speed * (1 - bottomDist / threshold)
   }

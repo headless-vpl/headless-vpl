@@ -34,8 +34,10 @@ export function getBezierPath(start: IPosition, end: IPosition): EdgePathResult 
   // ベジェ曲線の中間点（t = 0.5）
   const t = 0.5
   const mt = 1 - t
-  const labelX = mt * mt * mt * start.x + 3 * mt * mt * t * c1x + 3 * mt * t * t * c2x + t * t * t * end.x
-  const labelY = mt * mt * mt * start.y + 3 * mt * mt * t * c1y + 3 * mt * t * t * c2y + t * t * t * end.y
+  const labelX =
+    mt * mt * mt * start.x + 3 * mt * mt * t * c1x + 3 * mt * t * t * c2x + t * t * t * end.x
+  const labelY =
+    mt * mt * mt * start.y + 3 * mt * mt * t * c1y + 3 * mt * t * t * c2y + t * t * t * end.y
 
   return {
     path: `M ${start.x} ${start.y} C ${c1x} ${c1y}, ${c2x} ${c2y}, ${end.x} ${end.y}`,
@@ -66,11 +68,16 @@ export function getStepPath(start: IPosition, end: IPosition): EdgePathResult {
 export function getSmoothStepPath(
   start: IPosition,
   end: IPosition,
-  borderRadius: number = 8
+  borderRadius = 8
 ): EdgePathResult {
   const midX = (start.x + end.x) / 2
   const dy = end.y - start.y
-  const r = Math.min(borderRadius, Math.abs(dy) / 2, Math.abs(midX - start.x), Math.abs(end.x - midX))
+  const r = Math.min(
+    borderRadius,
+    Math.abs(dy) / 2,
+    Math.abs(midX - start.x),
+    Math.abs(end.x - midX)
+  )
 
   if (r <= 0 || dy === 0) {
     return getStepPath(start, end)

@@ -1,7 +1,7 @@
 export class DomController {
   private element: HTMLElement
-  private x: number = 0
-  private y: number = 0
+  private x = 0
+  private y = 0
 
   constructor(selector: string) {
     const el = document.querySelector(selector)

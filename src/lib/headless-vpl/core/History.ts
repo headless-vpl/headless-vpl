@@ -16,7 +16,7 @@ export class History {
   private _redoStack: Command[] = []
   private _maxDepth: number
 
-  constructor(maxDepth: number = 100) {
+  constructor(maxDepth = 100) {
     this._maxDepth = maxDepth
   }
 
@@ -25,7 +25,6 @@ export class History {
    * 新しいコマンド実行時に Redo スタックはクリアされる。
    */
   execute(command: Command): void {
-    command.execute()
     this._undoStack.push(command)
     this._redoStack = []
 
@@ -33,20 +32,22 @@ export class History {
     if (this._undoStack.length > this._maxDepth) {
       this._undoStack.shift()
     }
+
+    command.execute()
   }
 
   undo(): void {
     const command = this._undoStack.pop()
     if (!command) return
-    command.undo()
     this._redoStack.push(command)
+    command.undo()
   }
 
   redo(): void {
     const command = this._redoStack.pop()
     if (!command) return
-    command.execute()
     this._undoStack.push(command)
+    command.execute()
   }
 
   get canUndo(): boolean {

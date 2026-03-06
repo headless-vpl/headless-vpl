@@ -1,0 +1,62 @@
+{
+  "$schema": "https://biomejs.dev/schemas/1.9.0/schema.json",
+  "organizeImports": {
+    "enabled": true
+  },
+  "files": {
+    "ignore": [
+      "dist",
+      "node_modules",
+      ".changeset",
+      "docs-site/.vitepress/cache",
+      "docs-site/.vitepress/dist",
+      "examples",
+      "*.d.ts",
+      "src/App.tsx",
+      "src/main.tsx",
+      "src/pages",
+      "src/components",
+      "src/hooks",
+      "src/index.css",
+      "tsconfig*.json"
+    ]
+  },
+  "formatter": {
+    "enabled": true,
+    "indentStyle": "space",
+    "indentWidth": 2,
+    "lineWidth": 100,
+    "lineEnding": "lf"
+  },
+  "javascript": {
+    "formatter": {
+      "quoteStyle": "single",
+      "jsxQuoteStyle": "single",
+      "semicolons": "asNeeded",
+      "trailingCommas": "es5"
+    }
+  },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "recommended": true,
+      "suspicious": {
+        "noExplicitAny": "error"
+      },
+      "style": {
+        "noNonNullAssertion": "warn",
+        "noUselessElse": "warn",
+        "useSingleVarDeclarator": "warn"
+      },
+      "complexity": {
+        "noForEach": "warn",
+        "noUselessSwitchCase": "warn",
+        "noBannedTypes": "warn"
+      },
+      "correctness": {
+        "noUnusedImports": "error",
+        "noUnusedVariables": "warn"
+      }
+    }
+  }
+}

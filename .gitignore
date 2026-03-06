@@ -31,6 +31,10 @@ dist-ssr
 # 個人メモ
 docs/private/
 
+# VitePress generated files
+docs-site/.vitepress/cache/
+docs-site/.vitepress/dist/
+
 # Lock files (bun を使用)
 package-lock.json
 yarn.lock

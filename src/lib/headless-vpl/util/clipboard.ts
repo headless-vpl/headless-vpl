@@ -7,9 +7,7 @@ export type ClipboardData = {
 /**
  * 要素を JSON としてシリアライズし、ClipboardData を生成する。
  */
-export function copyElements(
-  elements: { toJSON(): Record<string, unknown> }[]
-): ClipboardData {
+export function copyElements(elements: { toJSON(): Record<string, unknown> }[]): ClipboardData {
   return {
     elements: elements.map((el) => el.toJSON()),
   }

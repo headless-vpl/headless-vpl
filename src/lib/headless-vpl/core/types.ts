@@ -11,7 +11,7 @@ export type Padding = {
 }
 
 let _nextId = 1
-export function generateId(prefix: string = 'vpl'): string {
+export function generateId(prefix = 'vpl'): string {
   return `${prefix}_${_nextId++}`
 }
 
@@ -39,7 +39,21 @@ export interface IEdge {
   toJSON(): Record<string, unknown>
 }
 
-export type VplEventType = 'move' | 'connect' | 'disconnect' | 'add' | 'remove' | 'update' | 'pan' | 'zoom' | 'select' | 'deselect' | 'nest' | 'unnest'
+export type VplEventType =
+  | 'move'
+  | 'connect'
+  | 'disconnect'
+  | 'add'
+  | 'remove'
+  | 'update'
+  | 'pan'
+  | 'zoom'
+  | 'select'
+  | 'deselect'
+  | 'nest'
+  | 'unnest'
+  | 'proximity'
+  | 'proximity-end'
 
 // --- Edge Types ---
 
@@ -58,9 +72,9 @@ export type EdgeMarker = {
 export type ResizeHandleDirection = 'n' | 's' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw'
 
 export interface Viewport {
-  x: number      // パンオフセット X（ピクセル）
-  y: number      // パンオフセット Y（ピクセル）
-  scale: number  // ズームスケール（1.0 = 100%）
+  x: number // パンオフセット X（ピクセル）
+  y: number // パンオフセット Y（ピクセル）
+  scale: number // ズームスケール（1.0 = 100%）
 }
 
 export interface VplEvent {

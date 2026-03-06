@@ -24,7 +24,7 @@ export type ResizeState = {
 export function detectResizeHandle(
   mousePos: IPosition,
   element: { position: IPosition; width: number; height: number },
-  handleSize: number = 8
+  handleSize = 8
 ): ResizeHandleDirection | null {
   const { x, y } = element.position
   const { width, height } = element
@@ -107,9 +107,9 @@ export function applyResize(
 
   // min/max 制約
   const minW = constraints.minWidth ?? 10
-  const maxW = constraints.maxWidth ?? Infinity
+  const maxW = constraints.maxWidth ?? Number.POSITIVE_INFINITY
   const minH = constraints.minHeight ?? 10
-  const maxH = constraints.maxHeight ?? Infinity
+  const maxH = constraints.maxHeight ?? Number.POSITIVE_INFINITY
 
   if (width < minW) {
     if (handle.includes('w')) x -= minW - width

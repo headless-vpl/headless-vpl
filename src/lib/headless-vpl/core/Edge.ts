@@ -1,10 +1,10 @@
-import type Connector from './Connector'
-import Workspace from './Workspace'
-import { generateId } from './types'
-import type { IEdge, EdgeType, EdgeMarker } from './types'
-import type { IPosition } from './Position'
-import { getStraightPath, getBezierPath, getStepPath, getSmoothStepPath } from '../util/edgePath'
+import { getBezierPath, getSmoothStepPath, getStepPath, getStraightPath } from '../util/edgePath'
 import type { EdgePathResult } from '../util/edgePath'
+import type Connector from './Connector'
+import type { IPosition } from './Position'
+import type Workspace from './Workspace'
+import { generateId } from './types'
+import type { EdgeMarker, EdgeType, IEdge } from './types'
 
 type EdgeProps = {
   workspace?: Workspace
@@ -65,7 +65,6 @@ class Edge implements IEdge {
         return getStepPath(start, end)
       case 'smoothstep':
         return getSmoothStepPath(start, end)
-      case 'straight':
       default:
         return getStraightPath(start, end)
     }

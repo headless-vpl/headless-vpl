@@ -36,7 +36,8 @@ export class KeyboardManager {
 
   private handleKeyDown(event: KeyboardEvent): void {
     const target = event.target as HTMLElement
-    const isEditable = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable
+    const isEditable =
+      target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable
 
     for (const binding of this.bindings) {
       if (this.matches(event, binding)) {

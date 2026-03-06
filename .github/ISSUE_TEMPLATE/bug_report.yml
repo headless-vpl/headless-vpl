@@ -1,0 +1,64 @@
+name: バグ報告
+description: バグを報告する
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        バグ報告ありがとうございます。できるだけ詳しく記入してください。
+
+  - type: textarea
+    id: description
+    attributes:
+      label: バグの内容
+      description: 何が起きたかを説明してください
+      placeholder: "例: DragAndDrop 中にコンテナが消える"
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: 再現手順
+      description: バグを再現する手順を記述してください
+      placeholder: |
+        1. Workspace を作成
+        2. Container を追加
+        3. ドラッグを開始すると...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: 期待する動作
+      description: 本来どうなるべきかを記述してください
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: headless-vpl のバージョン
+      placeholder: "例: 0.2.0"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: environment
+    attributes:
+      label: 実行環境
+      options:
+        - ブラウザ (Chrome)
+        - ブラウザ (Firefox)
+        - ブラウザ (Safari)
+        - Node.js
+        - その他
+    validations:
+      required: true
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: 追加情報
+      description: スクリーンショット、エラーログ、最小再現コード等

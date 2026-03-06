@@ -56,10 +56,9 @@ export function getElementsInMarquee<T extends MarqueeElement>(
 
     if (mode === 'full') {
       return ex1 >= mx1 && ey1 >= my1 && ex2 <= mx2 && ey2 <= my2
-    } else {
-      // partial: 矩形が重なるかチェック
-      return ex1 < mx2 && ex2 > mx1 && ey1 < my2 && ey2 > my1
     }
+    // partial: 矩形が重なるかチェック
+    return ex1 < mx2 && ex2 > mx1 && ey1 < my2 && ey2 > my1
   })
 }
 

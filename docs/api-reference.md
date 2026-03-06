@@ -81,7 +81,7 @@ node.children.input  // Connector 型
 | `children` | `T` | `{}` | 型付き子要素マップ |
 | `selected` | `boolean` | `false` | 選択状態（MovableObject から継承） |
 | `Parent` | `MovableObject \| null` | `null` | スナップ接続の親 |
-| `Children` | `MovableObject \| null` | `null` | スナップ接続の子 |
+| `Children` | `Set<MovableObject>` | `new Set()` | スナップ接続の子 |
 
 | メソッド | 説明 |
 |---|---|
@@ -105,7 +105,7 @@ node.children.input  // Connector 型
 | `type` | `string` | 要素種別 |
 | `selected` | `boolean` | 選択中かどうか |
 | `Parent` | `MovableObject \| null` | スナップ階層の親 |
-| `Children` | `MovableObject \| null` | スナップ階層の子 |
+| `Children` | `Set<MovableObject>` | スナップ階層の子 |
 | `workspace` | `Workspace` | 所属ワークスペース |
 
 | メソッド | 説明 |

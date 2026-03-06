@@ -315,6 +315,10 @@ This project includes [Claude Code](https://claude.com/claude-code) skills (slas
 npm install && npm run dev     # Start dev server
 npm run build                  # Production build
 npm run build:lib              # Library build
+npm run test                   # Run tests
+npm run lint                   # Lint
+npm run typecheck              # Type check
+npm run docs:dev               # Start docs site
 ```
 
 ---

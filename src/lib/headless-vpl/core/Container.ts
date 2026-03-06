@@ -1,10 +1,14 @@
 import AutoLayout from './AutoLayout'
+import Connector from './Connector'
 import { MovableObject } from './MovableObject'
 import Position from './Position'
-import Workspace from './Workspace'
-import type { SizingMode, Padding } from './types'
+import type Workspace from './Workspace'
+import type { Padding, SizingMode } from './types'
 
-type ContainerProps<T extends { [key: string]: MovableObject | AutoLayout } = {}> = {
+type ContainerProps<
+  // biome-ignore lint/complexity/noBannedTypes: {} is the idiomatic default for empty generic in TypeScript
+  T extends { [key: string]: MovableObject | AutoLayout } = {},
+> = {
   workspace?: Workspace
   position?: Position
   name: string
@@ -19,11 +23,13 @@ type ContainerProps<T extends { [key: string]: MovableObject | AutoLayout } = {}
   minHeight?: number
   maxHeight?: number
   resizable?: boolean
+  contentGap?: number
   children?: T
 }
 
 class Container<
-  T extends { [key: string]: MovableObject | AutoLayout } = {}
+  // biome-ignore lint/complexity/noBannedTypes: {} is the idiomatic default for empty generic in TypeScript
+  T extends { [key: string]: MovableObject | AutoLayout } = {},
 > extends MovableObject {
   color: string
   width: number
@@ -36,6 +42,7 @@ class Container<
   minHeight: number
   maxHeight: number
   resizable: boolean
+  contentGap: number
   children: T
 
   constructor({
@@ -53,6 +60,7 @@ class Container<
     minHeight,
     maxHeight,
     resizable,
+    contentGap,
     children,
   }: ContainerProps<T>) {
     super(workspace, position, name, 'container')
@@ -68,10 +76,11 @@ class Container<
       left: padding?.left ?? 0,
     }
     this.minWidth = minWidth ?? 0
-    this.maxWidth = maxWidth ?? Infinity
+    this.maxWidth = maxWidth ?? Number.POSITIVE_INFINITY
     this.minHeight = minHeight ?? 0
-    this.maxHeight = maxHeight ?? Infinity
+    this.maxHeight = maxHeight ?? Number.POSITIVE_INFINITY
     this.resizable = resizable ?? false
+    this.contentGap = contentGap ?? 0
     this.children = children || ({} as T)
 
     if (this.workspace) {
@@ -110,17 +119,58 @@ class Container<
     this.update()
   }
 
-  applyContentSize(contentWidth: number, contentHeight: number): void {
+  public override update(): void {
+    this.refreshAnchoredChildren()
+    super.update()
+  }
+
+  applyContentSize(_contentWidth: number, _contentHeight: number): void {
+    // resizesParent=true のAutoLayout子からサイズを計算
+    const bodyLayouts = Object.values(this.children).filter(
+      (child): child is AutoLayout => this.isAutoLayout(child) && child.resizesParent
+    )
+
+    let contentWidth = _contentWidth
+    let contentHeight = _contentHeight
+
+    if (bodyLayouts.length > 0) {
+      // Y座標でソートして正しい順序を保証
+      bodyLayouts.sort((a, b) => a.position.y - b.position.y)
+
+      // 高さ = body AutoLayout高さの合算 + contentGap × (count - 1)
+      contentHeight =
+        bodyLayouts.reduce((sum, l) => sum + l.height, 0) +
+        this.contentGap * Math.max(0, bodyLayouts.length - 1)
+      // 幅 = body AutoLayout幅の最大値
+      contentWidth = Math.max(...bodyLayouts.map((l) => l.width))
+
+      // body AutoLayoutを縦に自動配置
+      let cursor = bodyLayouts[0].position.y
+      for (const layout of bodyLayouts) {
+        if (layout.position.y !== cursor) {
+          layout.position.y = cursor
+          layout.relayout()
+        }
+        cursor += layout.height + this.contentGap
+      }
+    }
+
     let changed = false
     if (this.widthMode === 'hug') {
-      const newWidth = Math.min(Math.max(contentWidth + this.padding.left + this.padding.right, this.minWidth), this.maxWidth)
+      const newWidth = Math.min(
+        Math.max(contentWidth + this.padding.left + this.padding.right, this.minWidth),
+        this.maxWidth
+      )
       if (this.width !== newWidth) {
         this.width = newWidth
         changed = true
       }
     }
     if (this.heightMode === 'hug') {
-      const newHeight = Math.min(Math.max(contentHeight + this.padding.top + this.padding.bottom, this.minHeight), this.maxHeight)
+      const newHeight = Math.min(
+        Math.max(contentHeight + this.padding.top + this.padding.bottom, this.minHeight),
+        this.maxHeight
+      )
       if (this.height !== newHeight) {
         this.height = newHeight
         changed = true
@@ -128,6 +178,8 @@ class Container<
     }
     if (changed) {
       this.update()
+      // サイズ変更を親AutoLayoutに伝搬（ネストされたC-block対応）
+      this.parentAutoLayout?.update()
     }
   }
 
@@ -136,9 +188,13 @@ class Container<
       this.updateChildPosition(child)
       this.updateChildLayout(child)
     }
+    this.refreshAnchoredChildren()
   }
 
   private updateChildPosition(child: MovableObject | AutoLayout) {
+    if (child instanceof Connector && child.isAnchored()) {
+      return
+    }
     if (this.isMovableObject(child)) {
       child.move(this.position.x + child.position.x, this.position.y - child.position.y)
     }
@@ -151,21 +207,25 @@ class Container<
     }
   }
 
-  move(x: number, y: number) {
+  move(x: number, y: number, skipSnapCascade = false) {
     const dx = this.position.x - x
     const dy = this.position.y - y
-    super.move(x, y)
+    super.move(x, y, skipSnapCascade)
     this.updateChildrenPosition({ x: dx, y: dy })
   }
 
   private updateChildrenPosition(delta: { x: number; y: number }) {
     for (const child of Object.values(this.children)) {
       if (this.isMovableObject(child)) {
+        if (child instanceof Connector && child.isAnchored()) {
+          continue
+        }
         child.move(child.position.x - delta.x, child.position.y - delta.y)
       } else if (this.isAutoLayout(child)) {
-        child.update()
+        child.relayout()
       }
     }
+    this.refreshAnchoredChildren()
   }
 
   private isMovableObject(child: unknown): child is MovableObject {
@@ -174,6 +234,57 @@ class Container<
 
   private isAutoLayout(child: unknown): child is AutoLayout {
     return child instanceof AutoLayout
+  }
+
+  /**
+   * 構造的子要素をキーで追加する。ランタイムでの親コンテナ変更に使用。
+   */
+  addChild(key: string, child: MovableObject | AutoLayout): void {
+    ;(this.children as Record<string, MovableObject | AutoLayout>)[key] = child
+    if (this.workspace) {
+      this.bindChildWorkspace(child, this.workspace)
+    }
+    this.updateChildPosition(child)
+    this.updateChildLayout(child)
+    this.refreshAnchoredChildren()
+    this.update()
+  }
+
+  /**
+   * 構造的子要素をキーで除去する。workspaceからは除去しない（移動先で再利用）。
+   * 戻り値は除去された子要素。
+   */
+  removeChild(key: string): MovableObject | AutoLayout | undefined {
+    const child = (this.children as Record<string, MovableObject | AutoLayout>)[key]
+    if (!child) return undefined
+    delete (this.children as Record<string, MovableObject | AutoLayout>)[key]
+    if (this.isAutoLayout(child)) {
+      child.parentContainer = null
+    }
+    this.refreshAnchoredChildren()
+    this.update()
+    return child
+  }
+
+  /**
+   * 子要素のオブジェクト参照からキー名を逆引きする。
+   */
+  findChildKey(child: MovableObject | AutoLayout): string | undefined {
+    for (const [key, value] of Object.entries(this.children)) {
+      if (value === child) return key
+    }
+    return undefined
+  }
+
+  /**
+   * anchor を持つ Connector を親/兄弟の最新レイアウトに合わせて再配置する。
+   */
+  refreshAnchoredChildren(): void {
+    for (const child of Object.values(this.children)) {
+      if (child instanceof Connector) {
+        child.refreshAnchor(this)
+      }
+    }
   }
 
   public override toJSON(): Record<string, unknown> {

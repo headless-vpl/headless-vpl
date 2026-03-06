@@ -1,10 +1,10 @@
+import type Container from '../core/Container'
+import type { MovableObject } from '../core/MovableObject'
 import type { IPosition } from '../core/Position'
 import type Workspace from '../core/Workspace'
-import type { MovableObject } from '../core/MovableObject'
-import type Container from '../core/Container'
 import type { ClipboardData } from './clipboard'
-import { KeyboardManager } from './keyboard'
 import { copyElements, pasteElements } from './clipboard'
+import { KeyboardManager } from './keyboard'
 
 export type DefaultShortcutsConfig = {
   workspace: Workspace
@@ -66,11 +66,7 @@ export function bindDefaultShortcuts(config: DefaultShortcutsConfig): KeyboardMa
       modifiers: ['ctrl'],
       handler: () => {
         if (!clipboard) return
-        const pasted = pasteElements(
-          clipboard,
-          paste.factory,
-          paste.offset ?? { x: 40, y: 40 }
-        )
+        const pasted = pasteElements(clipboard, paste.factory, paste.offset ?? { x: 40, y: 40 })
         workspace.selection.deselectAll()
         for (const n of pasted) {
           workspace.selection.select(n)

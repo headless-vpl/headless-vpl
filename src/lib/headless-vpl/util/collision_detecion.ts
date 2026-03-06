@@ -1,5 +1,5 @@
-import Container from '../core/Container'
-import { IPosition } from '../core/Position'
+import type Container from '../core/Container'
+import type { IPosition } from '../core/Position'
 
 export function isCollision(container: Container, position: IPosition): boolean {
   //containerの矩形のサイズ

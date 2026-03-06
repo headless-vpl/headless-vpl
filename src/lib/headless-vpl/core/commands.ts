@@ -1,9 +1,9 @@
-import type { Command } from './History'
-import type { IWorkspaceElement, IEdge } from './types'
-import type Workspace from './Workspace'
-import type { MovableObject } from './MovableObject'
 import type AutoLayout from './AutoLayout'
 import type Container from './Container'
+import type { Command } from './History'
+import { MovableObject } from './MovableObject'
+import type Workspace from './Workspace'
+import type { IEdge, IWorkspaceElement } from './types'
 
 /**
  * 移動コマンド。要素を指定位置に移動する。
@@ -61,7 +61,7 @@ export class RemoveCommand implements Command {
   private element: IWorkspaceElement
   private relatedEdges: IEdge[] = []
   private savedParent: MovableObject | null = null
-  private savedChildren: MovableObject | null = null
+  private savedChildren: Set<MovableObject> = new Set()
   private savedChildElements: IWorkspaceElement[] = []
 
   constructor(workspace: Workspace, element: IWorkspaceElement) {
@@ -84,7 +84,10 @@ export class RemoveCommand implements Command {
     }
 
     return this.workspace.edges.filter((edge) => {
-      const e = edge as unknown as { startConnector?: { id: string }; endConnector?: { id: string } }
+      const e = edge as unknown as {
+        startConnector?: { id: string }
+        endConnector?: { id: string }
+      }
       return (
         (e.startConnector && childIds.has(e.startConnector.id)) ||
         (e.endConnector && childIds.has(e.endConnector.id))
@@ -94,21 +97,24 @@ export class RemoveCommand implements Command {
 
   execute(): void {
     // Parent/Children を保存してクリーンアップ
-    const mo = this.element as unknown as { Parent: MovableObject | null; Children: MovableObject | null }
+    const mo = this.element as unknown as {
+      Parent: MovableObject | null
+      Children: Set<MovableObject>
+    }
     this.savedParent = mo.Parent
-    this.savedChildren = mo.Children
+    this.savedChildren = new Set(mo.Children)
 
     for (const edge of this.relatedEdges) {
       this.workspace.removeEdge(edge)
     }
     if (mo.Parent) {
-      mo.Parent.Children = null
+      mo.Parent.Children.delete(mo as unknown as MovableObject)
       mo.Parent = null
     }
-    if (mo.Children) {
-      mo.Children.Parent = null
-      mo.Children = null
+    for (const child of mo.Children) {
+      child.Parent = null
     }
+    mo.Children.clear()
 
     // 子要素（Connector 等）を workspace から除去
     this.savedChildElements = []
@@ -135,14 +141,17 @@ export class RemoveCommand implements Command {
       this.workspace.addEdge(edge)
     }
     // Parent/Children を復元
-    const mo = this.element as unknown as { Parent: MovableObject | null; Children: MovableObject | null }
+    const mo = this.element as unknown as {
+      Parent: MovableObject | null
+      Children: Set<MovableObject>
+    }
     if (this.savedParent) {
       mo.Parent = this.savedParent
-      this.savedParent.Children = mo as unknown as MovableObject
+      this.savedParent.Children.add(mo as unknown as MovableObject)
     }
-    if (this.savedChildren) {
-      mo.Children = this.savedChildren
-      this.savedChildren.Parent = mo as unknown as MovableObject
+    for (const child of this.savedChildren) {
+      mo.Children.add(child)
+      child.Parent = mo as unknown as MovableObject
     }
   }
 }
@@ -152,12 +161,12 @@ export class RemoveCommand implements Command {
  */
 export class ConnectCommand implements Command {
   private workspace: Workspace
-  private parent: IWorkspaceElement & { Children: unknown }
+  private parent: IWorkspaceElement & { Children: Set<MovableObject> }
   private child: IWorkspaceElement & { Parent: unknown }
 
   constructor(
     workspace: Workspace,
-    parent: IWorkspaceElement & { Children: unknown },
+    parent: IWorkspaceElement & { Children: Set<MovableObject> },
     child: IWorkspaceElement & { Parent: unknown }
   ) {
     this.workspace = workspace
@@ -167,7 +176,7 @@ export class ConnectCommand implements Command {
 
   execute(): void {
     this.child.Parent = this.parent
-    this.parent.Children = this.child
+    this.parent.Children.add(this.child as unknown as MovableObject)
     this.workspace.eventBus.emit('connect', this.child, {
       parent: this.parent.id,
       child: this.child.id,
@@ -180,7 +189,7 @@ export class ConnectCommand implements Command {
       child: this.child.id,
     })
     this.child.Parent = null
-    this.parent.Children = null
+    this.parent.Children.delete(this.child as unknown as MovableObject)
   }
 }
 
@@ -207,6 +216,73 @@ export class BatchCommand implements Command {
   undo(): void {
     for (let i = this.commands.length - 1; i >= 0; i--) {
       this.commands[i].undo()
+    }
+  }
+}
+
+/**
+ * デタッチコマンド。snap Parent/Children 関係および AutoLayout からの除去を行う。
+ * ツリーDnDで要素を移動する前に、既存の親関係を解除するために使用する。
+ */
+export class DetachCommand implements Command {
+  private workspace: Workspace
+  private element: MovableObject
+  private savedParent: MovableObject | null = null
+  private savedAutoLayout: AutoLayout | null = null
+  private savedAutoLayoutIndex = -1
+
+  constructor(workspace: Workspace, element: MovableObject) {
+    this.workspace = workspace
+    this.element = element
+  }
+
+  execute(): void {
+    // snap Parent 関係を保存して解除
+    this.savedParent = this.element.Parent
+    if (this.savedParent) {
+      this.savedParent.Children.delete(this.element)
+      this.workspace.eventBus.emit('disconnect', this.element, {
+        parent: this.savedParent.id,
+        child: this.element.id,
+      })
+      this.element.Parent = null
+    }
+
+    // AutoLayout からの除去を保存して実行
+    this.savedAutoLayout = this.element.parentAutoLayout
+    if (this.savedAutoLayout) {
+      const children = this.savedAutoLayout.Children as Container[]
+      this.savedAutoLayoutIndex = children.indexOf(this.element as unknown as Container)
+      this.savedAutoLayout.removeElement(this.element as unknown as Container)
+      this.workspace.eventBus.emit('unnest', this.element, {
+        parentId: this.savedAutoLayout.parentContainer?.id ?? this.savedAutoLayout.id,
+        childId: this.element.id,
+      })
+    }
+  }
+
+  undo(): void {
+    // AutoLayout への復元
+    if (this.savedAutoLayout) {
+      this.savedAutoLayout.insertElement(
+        this.element as unknown as Container,
+        this.savedAutoLayoutIndex >= 0 ? this.savedAutoLayoutIndex : undefined
+      )
+      this.workspace.eventBus.emit('nest', this.element, {
+        parentId: this.savedAutoLayout.parentContainer?.id ?? this.savedAutoLayout.id,
+        childId: this.element.id,
+        index: this.savedAutoLayoutIndex,
+      })
+    }
+
+    // snap Parent 関係の復元
+    if (this.savedParent) {
+      this.element.Parent = this.savedParent
+      this.savedParent.Children.add(this.element)
+      this.workspace.eventBus.emit('connect', this.element, {
+        parent: this.savedParent.id,
+        child: this.element.id,
+      })
     }
   }
 }
@@ -242,5 +318,94 @@ export class NestCommand implements Command {
       parentId: this.layout.parentContainer?.id ?? this.layout.id,
       childId: this.child.id,
     })
+  }
+}
+
+/**
+ * 構造的子要素（Connector/AutoLayout）の親コンテナ変更コマンド。
+ * ワールド座標を維持しつつ、新しい親コンテナからの相対座標に変換する。
+ */
+export class ReparentChildCommand implements Command {
+  private child: MovableObject | AutoLayout
+  private sourceContainer: Container
+  private sourceKey: string
+  private targetContainer: Container | null
+  private targetKey: string | null
+  private savedRelativePos: { x: number; y: number }
+
+  constructor(
+    child: MovableObject | AutoLayout,
+    sourceContainer: Container,
+    sourceKey: string,
+    targetContainer?: Container,
+    targetKey?: string
+  ) {
+    this.child = child
+    this.sourceContainer = sourceContainer
+    this.sourceKey = sourceKey
+    this.targetContainer = targetContainer ?? null
+    this.targetKey = targetKey ?? null
+    // 元の相対座標を保存（undo用）
+    this.savedRelativePos = { x: child.position.x, y: child.position.y }
+  }
+
+  execute(): void {
+    // ワールド座標を記録
+    let worldX: number
+    let worldY: number
+    if (this.child instanceof MovableObject) {
+      // Connector: position はワールド座標そのもの（parent.x + relative.x, parent.y - relative.y で計算されている）
+      worldX = this.child.position.x
+      worldY = this.child.position.y
+    } else {
+      // AutoLayout: absolutePosition がワールド座標
+      const abs = (this.child as AutoLayout).absolutePosition
+      worldX = abs.x
+      worldY = abs.y
+    }
+
+    // 元の親から除去
+    this.sourceContainer.removeChild(this.sourceKey)
+
+    if (this.targetContainer && this.targetKey) {
+      // 新しい親からの相対座標に変換
+      const targetPos = this.targetContainer.position
+      if (this.child instanceof MovableObject) {
+        // Connector の相対座標: relative.x = world.x - parent.x, relative.y = parent.y - world.y
+        this.child.position.x = worldX - targetPos.x
+        this.child.position.y = targetPos.y - worldY
+      } else {
+        // AutoLayout の相対座標: relative.x = world.x - parent.x, relative.y = world.y - parent.y
+        this.child.position.x = worldX - targetPos.x
+        this.child.position.y = worldY - targetPos.y
+      }
+
+      // 新しい親に追加
+      this.targetContainer.addChild(this.targetKey, this.child)
+      return
+    }
+
+    // Workspace 直下に外す場合はワールド座標をそのまま保持
+    this.child.position.x = worldX
+    this.child.position.y = worldY
+    if (this.child instanceof MovableObject) {
+      this.child.update()
+    } else {
+      this.child.workspace.eventBus.emit('update', this.child)
+    }
+  }
+
+  undo(): void {
+    // 新しい親から除去（workspace直下へ外していた場合は不要）
+    if (this.targetContainer && this.targetKey) {
+      this.targetContainer.removeChild(this.targetKey)
+    }
+
+    // 元の相対座標を復元
+    this.child.position.x = this.savedRelativePos.x
+    this.child.position.y = this.savedRelativePos.y
+
+    // 元の親に追加
+    this.sourceContainer.addChild(this.sourceKey, this.child)
   }
 }

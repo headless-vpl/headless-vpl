@@ -1,4 +1,4 @@
-import Container from '../core/Container'
+import type Container from '../core/Container'
 
 export function moveGroup(containers: Container[], delta: { x: number; y: number }) {
   for (const container of containers) {

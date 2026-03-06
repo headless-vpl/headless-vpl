@@ -1,5 +1,5 @@
-import type Workspace from '../core/Workspace'
 import type Container from '../core/Container'
+import type Workspace from '../core/Workspace'
 
 export type DomSyncConfig = {
   workspace: Workspace
@@ -64,6 +64,13 @@ export class DomSyncHelper {
     if (container.resizable) {
       el.style.width = `${container.width}px`
       el.style.height = `${container.height}px`
+    }
+    // hugモードの場合、AutoLayoutが計算したサイズをDOMに反映する
+    if (container.heightMode === 'hug') {
+      el.style.height = `${container.height}px`
+    }
+    if (container.widthMode === 'hug') {
+      el.style.width = `${container.width}px`
     }
   }
 }

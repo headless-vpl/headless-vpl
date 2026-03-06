@@ -1,0 +1,131 @@
+/* ========================================
+   Headless VPL — カスタムテーマ
+   ======================================== */
+
+/* --- ブランドカラー (indigo系) --- */
+:root {
+  --vp-c-brand-1: #6366f1;
+  --vp-c-brand-2: #818cf8;
+  --vp-c-brand-3: #4f46e5;
+  --vp-c-brand-soft: rgba(99, 102, 241, 0.14);
+}
+
+.dark {
+  --vp-c-brand-1: #818cf8;
+  --vp-c-brand-2: #a5b4fc;
+  --vp-c-brand-3: #6366f1;
+  --vp-c-brand-soft: rgba(129, 140, 248, 0.16);
+}
+
+/* --- ヒーロー: グラデーションタイトル --- */
+:root {
+  --vp-home-hero-name-color: transparent;
+  --vp-home-hero-name-background: linear-gradient(135deg, #6366f1, #a855f7, #ec4899);
+}
+
+/* --- ヒーロー: 背景グロー --- */
+.VPHero {
+  position: relative;
+}
+
+.VPHero::before {
+  content: "";
+  position: absolute;
+  top: -20%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 600px;
+  height: 400px;
+  background: radial-gradient(ellipse, rgba(99, 102, 241, 0.15) 0%, transparent 70%);
+  pointer-events: none;
+  z-index: -1;
+}
+
+.dark .VPHero::before {
+  background: radial-gradient(ellipse, rgba(129, 140, 248, 0.12) 0%, transparent 70%);
+}
+
+/* --- フィーチャーカード: ホバーエフェクト --- */
+.VPFeature {
+  transition: transform 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
+}
+
+.VPFeature:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 32px rgba(99, 102, 241, 0.12);
+  border-color: var(--vp-c-brand-soft);
+}
+
+.dark .VPFeature:hover {
+  box-shadow: 0 12px 32px rgba(129, 140, 248, 0.08);
+}
+
+/* --- ブランドボタン: グロー効果 --- */
+.VPButton.brand {
+  box-shadow: 0 0 20px rgba(99, 102, 241, 0.3);
+}
+
+.VPButton.brand:hover {
+  box-shadow: 0 0 32px rgba(99, 102, 241, 0.5);
+}
+
+.dark .VPButton.brand {
+  box-shadow: 0 0 20px rgba(129, 140, 248, 0.25);
+}
+
+.dark .VPButton.brand:hover {
+  box-shadow: 0 0 32px rgba(129, 140, 248, 0.4);
+}
+
+/* --- フェードインアニメーション --- */
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.VPHero .main {
+  animation: fade-in-up 0.8s ease-out both;
+}
+
+.VPFeatures .item {
+  opacity: 0;
+  animation: fade-in-up 0.6s ease-out both;
+}
+
+.VPFeatures .item:nth-child(1) {
+  animation-delay: 0.1s;
+}
+.VPFeatures .item:nth-child(2) {
+  animation-delay: 0.2s;
+}
+.VPFeatures .item:nth-child(3) {
+  animation-delay: 0.3s;
+}
+.VPFeatures .item:nth-child(4) {
+  animation-delay: 0.4s;
+}
+.VPFeatures .item:nth-child(5) {
+  animation-delay: 0.5s;
+}
+.VPFeatures .item:nth-child(6) {
+  animation-delay: 0.6s;
+}
+
+/* --- アクセシビリティ --- */
+@media (prefers-reduced-motion: reduce) {
+  .VPHero .main,
+  .VPFeatures .item {
+    animation: none;
+    opacity: 1;
+  }
+
+  .VPFeature {
+    transition: none;
+  }
+}

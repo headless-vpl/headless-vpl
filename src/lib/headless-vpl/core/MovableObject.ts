@@ -1,5 +1,6 @@
-import Position from './Position'
-import Workspace from './Workspace'
+import type AutoLayout from './AutoLayout'
+import type Position from './Position'
+import type Workspace from './Workspace'
 import { generateId } from './types'
 import type { IWorkspaceElement } from './types'
 
@@ -12,14 +13,16 @@ export abstract class MovableObject implements IWorkspaceElement {
 
   /** スナップ接続による親 (型安全) */
   public Parent: MovableObject | null = null
-  /** スナップ接続による子 (型安全) */
-  public Children: MovableObject | null = null
+  /** スナップ接続による子 (複数対応) */
+  public Children: Set<MovableObject> = new Set()
+  /** この要素が所属するAutoLayout（サイズ変更の伝搬に使用） */
+  public parentAutoLayout: AutoLayout | null = null
 
   public workspace!: Workspace
   public position: Position
   public name: string
   public type: string
-  public selected: boolean = false
+  public selected = false
 
   constructor(workspace: Workspace | undefined, position: Position, name: string, type: string) {
     this.id = generateId(type)
@@ -39,16 +42,20 @@ export abstract class MovableObject implements IWorkspaceElement {
 
   /**
    * 位置を変更し 'move' イベントを発火する。
+   * @param skipSnapCascade trueの場合、スナップ接続された子へのカスケード移動をスキップする（AutoLayout配置時に使用）
    */
-  public move(x: number, y: number): void {
+  public move(x: number, y: number, skipSnapCascade = false): void {
     const dx = x - this.position.x
     const dy = y - this.position.y
     this.position.x = x
     this.position.y = y
     this.workspace.eventBus.emit('move', this)
-    // スナップ接続された子を再帰的に追従させる
-    if (this.Children) {
-      this.Children.move(this.Children.position.x + dx, this.Children.position.y + dy)
+    if (!skipSnapCascade) {
+      // スナップ接続された子を再帰的に追従させる
+      for (const child of this.Children) {
+        if (child.Parent !== this) continue
+        child.move(child.position.x + dx, child.position.y + dy)
+      }
     }
   }
 

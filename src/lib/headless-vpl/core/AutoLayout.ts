@@ -1,6 +1,6 @@
-import Container from './Container'
-import Workspace from './Workspace'
-import Position from './Position'
+import type Container from './Container'
+import type Position from './Position'
+import type Workspace from './Workspace'
 import { generateId } from './types'
 import type { IWorkspaceElement } from './types'
 
@@ -18,6 +18,7 @@ type AutoLayoutProps = {
   containers: Container[]
   minWidth?: number
   minHeight?: number
+  resizesParent?: boolean
 }
 
 /**
@@ -30,18 +31,31 @@ class AutoLayout implements IWorkspaceElement {
   Children: Container[] = []
   position: Position
   parentContainer: Container | null = null
-  width: number = 100
-  height: number = 100
+  width = 100
+  height = 100
   direction: AutoLayoutDirection
   gap: number
   alignment: AutoLayoutAlignment
   minWidth: number
   minHeight: number
+  resizesParent: boolean
   workspace!: Workspace
-  name: string = 'autoLayout'
-  type: string = 'autoLayout'
+  name = 'autoLayout'
+  type = 'autoLayout'
 
-  constructor({ workspace, position, width, height, direction, gap, alignment, containers, minWidth, minHeight }: AutoLayoutProps) {
+  constructor({
+    workspace,
+    position,
+    width,
+    height,
+    direction,
+    gap,
+    alignment,
+    containers,
+    minWidth,
+    minHeight,
+    resizesParent,
+  }: AutoLayoutProps) {
     this.id = generateId('autolayout')
     if (workspace) this.workspace = workspace
     this.Children = containers
@@ -53,6 +67,7 @@ class AutoLayout implements IWorkspaceElement {
     this.alignment = alignment ?? 'center'
     this.minWidth = minWidth ?? 0
     this.minHeight = minHeight ?? 0
+    this.resizesParent = resizesParent ?? true
     if (this.workspace) {
       this.workspace.addElement(this)
     }
@@ -79,6 +94,7 @@ class AutoLayout implements IWorkspaceElement {
     } else {
       this.Children.push(element)
     }
+    element.parentAutoLayout = this
     this.update()
   }
 
@@ -86,8 +102,19 @@ class AutoLayout implements IWorkspaceElement {
     const idx = this.Children.indexOf(element)
     if (idx === -1) return false
     this.Children.splice(idx, 1)
+    element.parentAutoLayout = null
     this.update()
     return true
+  }
+
+  /** 子要素の位置のみ更新する（コンテンツサイズ再計算・親への伝搬なし） */
+  relayout(): void {
+    if (!this.parentContainer) return
+    const abs = this.absolutePosition
+    if (this.direction === 'horizontal') this.layoutHorizontal(abs)
+    else this.layoutVertical(abs)
+    this.parentContainer.refreshAnchoredChildren()
+    this.workspace.eventBus.emit('update', this)
   }
 
   update() {
@@ -106,29 +133,32 @@ class AutoLayout implements IWorkspaceElement {
       this.layoutVertical(abs)
     }
 
-    this.parentContainer.applyContentSize(contentSize.width, contentSize.height)
+    if (this.resizesParent) {
+      this.parentContainer.applyContentSize(contentSize.width, contentSize.height)
+    }
 
+    this.parentContainer.refreshAnchoredChildren()
     this.workspace.eventBus.emit('update', this)
   }
 
   private layoutHorizontal(abs: { x: number; y: number }) {
     let cursor = abs.x
 
-    this.Children.forEach((child) => {
+    for (const child of this.Children) {
       const y = this.alignCrossAxis(abs.y, this.height, child.height)
-      child.move(cursor, y)
+      child.move(cursor, y, true)
       cursor += child.width + this.gap
-    })
+    }
   }
 
   private layoutVertical(abs: { x: number; y: number }) {
     let cursor = abs.y
 
-    this.Children.forEach((child) => {
+    for (const child of this.Children) {
       const x = this.alignCrossAxis(abs.x, this.width, child.width)
-      child.move(x, cursor)
+      child.move(x, cursor, true)
       cursor += child.height + this.gap
-    })
+    }
   }
 
   private alignCrossAxis(start: number, containerSize: number, childSize: number): number {
@@ -156,13 +186,12 @@ class AutoLayout implements IWorkspaceElement {
         width: Math.max(totalWidth, this.minWidth),
         height: Math.max(maxHeight, this.minHeight),
       }
-    } else {
-      const maxWidth = Math.max(...this.Children.map((c) => c.width))
-      const totalHeight = this.Children.reduce((sum, c) => sum + c.height, 0) + totalGap
-      return {
-        width: Math.max(maxWidth, this.minWidth),
-        height: Math.max(totalHeight, this.minHeight),
-      }
+    }
+    const maxWidth = Math.max(...this.Children.map((c) => c.width))
+    const totalHeight = this.Children.reduce((sum, c) => sum + c.height, 0) + totalGap
+    return {
+      width: Math.max(maxWidth, this.minWidth),
+      height: Math.max(totalHeight, this.minHeight),
     }
   }
 

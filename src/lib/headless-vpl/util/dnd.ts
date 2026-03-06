@@ -1,7 +1,7 @@
-import Container from '../core/Container'
-import { IPosition } from '../core/Position'
+import type Container from '../core/Container'
+import type { IPosition } from '../core/Position'
 import { isCollision } from './collision_detecion'
-import { getMouseState } from './mouse'
+import type { getMouseState } from './mouse'
 
 /**
  * 複数のコンテナーに対してドラッグ＆ドロップの更新を行います。
@@ -23,38 +23,33 @@ export function DragAndDrop(
   mouseState: getMouseState,
   dragEligible: boolean,
   currentDragContainers: Container[],
-  allowMultiple: boolean = false,
+  allowMultiple = false,
   callback?: () => void
 ): Container[] {
   // 現在のドラッグ中コンテナー配列をコピーして更新を行う
   let newDragContainers = [...currentDragContainers]
 
   if (mouseState.buttonState.leftButton === 'down') {
-    containers.forEach((container) => {
+    for (const container of containers) {
       if (newDragContainers.includes(container)) {
         // 親もドラッグ中なら、親の move() が自動追従するのでスキップ
         if (container.Parent && newDragContainers.includes(container.Parent as Container)) {
-          return
+          continue
         }
-        // 既にドラッグ中のコンテナーは移動＆赤色に更新
-        container.setColor('red')
+        // 既にドラッグ中のコンテナーは移動
         container.move(container.position.x + delta.x, container.position.y + delta.y)
         callback?.()
       } else if (isCollision(container, mouseState.mousePosition) && dragEligible) {
         if (!allowMultiple && newDragContainers.length > 0) {
           // 複数ドラッグが許可されていない場合、最初のコンテナのみをドラッグ
-          return
+          continue
         }
         // クリック開始時にコンテナー上でクリックされていたら、ドラッグ中リストに追加
         newDragContainers.push(container)
-      } else {
-        // それ以外は緑色に
-        container.setColor(container.color)
       }
-    })
+    }
   } else {
-    // マウスボタンが離された場合は全てのコンテナーをリセット
-    containers.forEach((container) => container.setColor('green'))
+    // マウスボタンが離された場合はドラッグ状態をリセット
     newDragContainers = []
   }
 

@@ -1,10 +1,10 @@
-import type { VplEvent, EdgeMarker } from '../core/types'
-import type Workspace from '../core/Workspace'
-import Container from '../core/Container'
-import Connector from '../core/Connector'
-import Edge from '../core/Edge'
 import AutoLayout from '../core/AutoLayout'
-import { MovableObject } from '../core/MovableObject'
+import Connector from '../core/Connector'
+import Container from '../core/Container'
+import Edge from '../core/Edge'
+import type { IPosition } from '../core/Position'
+import type Workspace from '../core/Workspace'
+import type { EdgeMarker, VplEvent } from '../core/types'
 
 const SVG_NS = 'http://www.w3.org/2000/svg'
 
@@ -19,6 +19,12 @@ export class SvgRenderer {
   private workspace: Workspace
   private elementMap = new Map<string, SVGElement>()
   private markerDefs = new Set<string>()
+
+  /** position → connectorId の逆引きマップ */
+  private positionToConnectorId = new WeakMap<IPosition, string>()
+
+  /** proximity 中のコネクタIDペアを追跡（connectionId → { sourceId, targetId }） */
+  private proximityConnectors = new Map<string, { sourceId: string; targetId: string }>()
 
   constructor(svgRoot: SVGSVGElement, workspace: Workspace) {
     this.svgRoot = svgRoot
@@ -40,6 +46,10 @@ export class SvgRenderer {
     workspace.on('deselect', (event) => this.onDeselect(event))
     workspace.on('pan', () => this.updateViewportTransform())
     workspace.on('zoom', () => this.updateViewportTransform())
+    workspace.on('proximity', (event) => this.onProximity(event))
+    workspace.on('proximity-end', (event) => this.onProximityEnd(event))
+    workspace.on('connect', (event) => this.onConnect(event))
+    workspace.on('disconnect', (event) => this.onDisconnect(event))
   }
 
   private updateViewportTransform(): void {
@@ -52,6 +62,9 @@ export class SvgRenderer {
   private onAdd(event: VplEvent) {
     const target = event.target
     this.ensureElement(target)
+    if (target instanceof Connector) {
+      this.refreshConnectorProximityColors()
+    }
   }
 
   private onMove(event: VplEvent) {
@@ -65,12 +78,17 @@ export class SvgRenderer {
       this.ensureElement(edge)
       this.updateEdgePath(edge as Edge)
     }
+
+    this.refreshConnectorProximityColors()
   }
 
   private onUpdate(event: VplEvent) {
     const target = event.target
     this.ensureElement(target)
     this.updateElement(target)
+    if (target instanceof Connector) {
+      this.refreshConnectorProximityColors()
+    }
   }
 
   private onRemove(event: VplEvent) {
@@ -82,6 +100,9 @@ export class SvgRenderer {
       svgEl.remove()
       this.elementMap.delete(id)
     }
+    if (target instanceof Connector) {
+      this.refreshConnectorProximityColors()
+    }
   }
 
   private onSelect(event: VplEvent) {
@@ -89,7 +110,15 @@ export class SvgRenderer {
     const id = this.getId(target)
     if (!id) return
     const svgEl = this.elementMap.get(id)
-    if (svgEl) {
+    if (!svgEl) return
+
+    if (target instanceof Connector) {
+      const dot = svgEl.querySelector('[data-role="center-dot"]')
+      if (dot) {
+        dot.setAttribute('stroke-dasharray', '6 3')
+        dot.setAttribute('stroke-width', '6')
+      }
+    } else {
       svgEl.setAttribute('stroke-dasharray', '6 3')
       svgEl.setAttribute('stroke-width', '6')
     }
@@ -100,13 +129,17 @@ export class SvgRenderer {
     const id = this.getId(target)
     if (!id) return
     const svgEl = this.elementMap.get(id)
-    if (svgEl) {
-      svgEl.removeAttribute('stroke-dasharray')
-      if (target instanceof Container) {
-        svgEl.setAttribute('stroke-width', '4')
-      } else if (target instanceof Connector) {
-        svgEl.removeAttribute('stroke-width')
+    if (!svgEl) return
+
+    if (target instanceof Connector) {
+      const dot = svgEl.querySelector('[data-role="center-dot"]')
+      if (dot) {
+        dot.removeAttribute('stroke-dasharray')
+        dot.removeAttribute('stroke-width')
       }
+    } else if (target instanceof Container) {
+      svgEl.removeAttribute('stroke-dasharray')
+      svgEl.setAttribute('stroke-width', '4')
     }
   }
 
@@ -115,7 +148,8 @@ export class SvgRenderer {
   private ensureElement(target: unknown): SVGElement | null {
     const id = this.getId(target)
     if (!id) return null
-    if (this.elementMap.has(id)) return this.elementMap.get(id)!
+    const existing = this.elementMap.get(id)
+    if (existing) return existing
     return this.createElement(target, id)
   }
 
@@ -188,27 +222,53 @@ export class SvgRenderer {
 
   // --- Connector ---
 
-  private createConnectorCircle(connector: Connector): SVGCircleElement {
-    const circle = document.createElementNS(SVG_NS, 'circle')
-    circle.setAttribute('cx', `${connector.position.x}`)
-    circle.setAttribute('cy', `${connector.position.y}`)
-    circle.setAttribute('r', '10')
-    circle.setAttribute('stroke', 'black')
-    circle.setAttribute('fill', 'red')
-    return circle
+  private createConnectorCircle(connector: Connector): SVGGElement {
+    const g = document.createElementNS(SVG_NS, 'g')
+
+    // position → connectorId の逆引きを登録
+    this.positionToConnectorId.set(connector.position, connector.id)
+
+    // hit area circle（hitRadius反映）
+    const hitArea = document.createElementNS(SVG_NS, 'circle')
+    hitArea.setAttribute('cx', `${connector.position.x}`)
+    hitArea.setAttribute('cy', `${connector.position.y}`)
+    hitArea.setAttribute('r', `${connector.hitRadius}`)
+    hitArea.setAttribute('fill', '#3b82f6')
+    hitArea.setAttribute('fill-opacity', '0.15')
+    hitArea.setAttribute('stroke', '#2563eb')
+    hitArea.setAttribute('stroke-opacity', '0.5')
+    hitArea.setAttribute('stroke-width', '1.5')
+    hitArea.setAttribute('stroke-dasharray', '4 4')
+    hitArea.setAttribute('pointer-events', 'none')
+    hitArea.setAttribute('data-role', 'hit-area')
+    g.appendChild(hitArea)
+
+    // center dot（固定サイズ）
+    const dot = document.createElementNS(SVG_NS, 'circle')
+    dot.setAttribute('cx', `${connector.position.x}`)
+    dot.setAttribute('cy', `${connector.position.y}`)
+    dot.setAttribute('r', '5')
+    dot.setAttribute('stroke', '#2563eb')
+    dot.setAttribute('fill', '#3b82f6')
+    dot.setAttribute('data-role', 'center-dot')
+    g.appendChild(dot)
+
+    return g
   }
 
   private updateConnectorCircle(connector: Connector): void {
-    const circle = this.elementMap.get(connector.id)
-    if (!circle) return
-    circle.setAttribute('cx', `${connector.position.x}`)
-    circle.setAttribute('cy', `${connector.position.y}`)
+    const g = this.elementMap.get(connector.id)
+    if (!g) return
+    for (const circle of g.querySelectorAll('circle')) {
+      circle.setAttribute('cx', `${connector.position.x}`)
+      circle.setAttribute('cy', `${connector.position.y}`)
+    }
   }
 
   // --- Edge (<g> wrapping <path> + optional <text>) ---
 
   private getMarkerId(marker: EdgeMarker): string {
-    const color = marker.color ?? 'black'
+    const color = marker.color ?? 'currentColor'
     const size = marker.size ?? 10
     return `marker-${marker.type}-${color.replace('#', '')}-${size}`
   }
@@ -217,7 +277,7 @@ export class SvgRenderer {
     const id = this.getMarkerId(marker)
     if (this.markerDefs.has(id)) return id
 
-    const color = marker.color ?? 'black'
+    const color = marker.color ?? 'currentColor'
     const size = marker.size ?? 10
 
     const markerEl = document.createElementNS(SVG_NS, 'marker')
@@ -250,7 +310,7 @@ export class SvgRenderer {
 
     const pathEl = document.createElementNS(SVG_NS, 'path')
     pathEl.setAttribute('d', pathResult.path)
-    pathEl.setAttribute('stroke', 'black')
+    pathEl.setAttribute('stroke', 'currentColor')
     pathEl.setAttribute('stroke-width', '2')
     pathEl.setAttribute('fill', 'none')
     pathEl.setAttribute('data-role', 'edge-path')
@@ -275,7 +335,7 @@ export class SvgRenderer {
       text.setAttribute('text-anchor', 'middle')
       text.setAttribute('dominant-baseline', 'middle')
       text.setAttribute('font-size', '12')
-      text.setAttribute('fill', '#333')
+      text.setAttribute('fill', 'currentColor')
       text.setAttribute('data-role', 'edge-label')
       text.textContent = edge.label
       g.appendChild(text)
@@ -326,5 +386,101 @@ export class SvgRenderer {
     rect.setAttribute('y', `${abs.y}`)
     rect.setAttribute('width', `${autoLayout.width}`)
     rect.setAttribute('height', `${autoLayout.height}`)
+  }
+
+  // --- Connector hit area の動的表示制御 ---
+
+  /** コネクタIDから hit-area circle を取得 */
+  private getHitArea(connectorId: string): SVGCircleElement | null {
+    const g = this.elementMap.get(connectorId)
+    if (!g) return null
+    return g.querySelector('[data-role="hit-area"]') as SVGCircleElement | null
+  }
+
+  /** hit area を赤色に変更する。半径は実際の hitRadius に固定する。 */
+  private setHitAreaProximity(connector: Connector): void {
+    const hitArea = this.getHitArea(connector.id)
+    if (!hitArea) return
+    hitArea.setAttribute('r', `${connector.hitRadius}`)
+    hitArea.setAttribute('fill', '#ef4444')
+    hitArea.setAttribute('fill-opacity', '0.12')
+    hitArea.setAttribute('stroke', '#dc2626')
+    hitArea.setAttribute('stroke-opacity', '0.4')
+  }
+
+  /** hit area を青色（デフォルト）に戻す */
+  private resetHitAreaColor(connector: Connector): void {
+    const hitArea = this.getHitArea(connector.id)
+    if (!hitArea) return
+    hitArea.setAttribute('r', `${connector.hitRadius}`)
+    hitArea.setAttribute('fill', '#3b82f6')
+    hitArea.setAttribute('fill-opacity', '0.08')
+    hitArea.setAttribute('stroke', '#2563eb')
+    hitArea.setAttribute('stroke-opacity', '0.25')
+  }
+
+  private onProximity(event: VplEvent): void {
+    const data = event.data
+    if (!data) return
+    const connectionId = data.connectionId as string
+    const sourcePosition = data.sourcePosition as IPosition
+    const targetPosition = data.targetPosition as IPosition
+
+    const sourceId = this.positionToConnectorId.get(sourcePosition)
+    const targetId = this.positionToConnectorId.get(targetPosition)
+    if (!sourceId || !targetId) return
+
+    this.proximityConnectors.set(connectionId, { sourceId, targetId })
+    this.refreshConnectorProximityColors()
+  }
+
+  private onProximityEnd(event: VplEvent): void {
+    const data = event.data
+    if (!data) return
+    const connectionId = data.connectionId as string
+
+    const entry = this.proximityConnectors.get(connectionId)
+    if (!entry) return
+
+    this.proximityConnectors.delete(connectionId)
+    this.refreshConnectorProximityColors()
+  }
+
+  private onConnect(_event: VplEvent): void {
+    // 接続後も他コネクタとの近接状況に応じて色を再評価する
+    this.refreshConnectorProximityColors()
+  }
+
+  private onDisconnect(_event: VplEvent): void {
+    this.refreshConnectorProximityColors()
+  }
+
+  private getAllConnectors(): Connector[] {
+    return this.workspace.elements.filter((el): el is Connector => el instanceof Connector)
+  }
+
+  /**
+   * proximity イベントで通知されたコネクタだけを赤表示にする。
+   */
+  private refreshConnectorProximityColors(): void {
+    const connectors = this.getAllConnectors()
+    const highlightedIds = new Set<string>()
+
+    for (const [connectionId, entry] of this.proximityConnectors.entries()) {
+      if (!this.elementMap.has(entry.sourceId) || !this.elementMap.has(entry.targetId)) {
+        this.proximityConnectors.delete(connectionId)
+        continue
+      }
+      highlightedIds.add(entry.sourceId)
+      highlightedIds.add(entry.targetId)
+    }
+
+    for (const connector of connectors) {
+      if (highlightedIds.has(connector.id)) {
+        this.setHitAreaProximity(connector)
+      } else {
+        this.resetHitAreaColor(connector)
+      }
+    }
   }
 }

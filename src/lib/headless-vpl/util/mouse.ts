@@ -1,4 +1,4 @@
-import { IPosition } from '../core/Position'
+import type { IPosition } from '../core/Position'
 
 export function getMousePosition(parent: HTMLElement): IPosition {
   const mousePosition: IPosition = {

@@ -1,4 +1,4 @@
-import type { VplEventType, VplEvent } from './types'
+import type { VplEvent, VplEventType } from './types'
 
 /**
  * 最小限のイベントシステム。
@@ -11,7 +11,7 @@ export class EventBus {
     if (!this.handlers.has(type)) {
       this.handlers.set(type, new Set())
     }
-    this.handlers.get(type)!.add(handler)
+    this.handlers.get(type)?.add(handler)
     return () => {
       this.handlers.get(type)?.delete(handler)
     }
@@ -19,6 +19,8 @@ export class EventBus {
 
   emit(type: VplEventType, target: unknown, data?: Record<string, unknown>): void {
     const event: VplEvent = { type, target, data }
-    this.handlers.get(type)?.forEach((handler) => handler(event))
+    for (const handler of this.handlers.get(type) ?? []) {
+      handler(event)
+    }
   }
 }

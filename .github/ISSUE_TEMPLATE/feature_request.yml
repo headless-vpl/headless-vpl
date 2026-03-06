@@ -1,0 +1,51 @@
+name: 機能リクエスト
+description: 新しい機能を提案する
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        機能リクエストありがとうございます！
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: 解決したい問題
+      description: どんな課題やユースケースがあるかを説明してください
+      placeholder: "例: ノード間の接続線をドラッグで作成したいが、現在のAPIでは手動でEdgeを作る必要がある"
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: 提案する解決策
+      description: どのようなAPIや機能を追加すべきかを記述してください
+      placeholder: |
+        ```typescript
+        // 提案するAPI例
+        const builder = new EdgeBuilder({ workspace, connectors })
+        builder.startFrom(connector)
+        ```
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: 検討した代替案
+      description: 他に検討したアプローチがあれば記述してください
+
+  - type: dropdown
+    id: category
+    attributes:
+      label: カテゴリ
+      description: 4つの型のどれに該当するか
+      options:
+        - 描画の型（レンダリング、レイアウト）
+        - 接続の型（コネクター、エッジ、親子関係）
+        - 移動の型（DnD、スナップ、グループ移動）
+        - 入力の型（入力コンポーネント）
+        - その他（ユーティリティ、DX等）
+    validations:
+      required: true
