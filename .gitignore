@@ -26,7 +26,8 @@ dist-ssr
 
 # AI IDE settings
 .cursor
-.claude
+.claude/*
+!.claude/skills/
 
 # 個人メモ
 docs/private/

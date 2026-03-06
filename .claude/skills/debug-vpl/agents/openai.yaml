@@ -1,0 +1,4 @@
+interface:
+  display_name: "Debug VPL"
+  short_description: "Diagnose current headless-vpl interaction bugs"
+  default_prompt: "Use $debug-vpl to investigate a headless-vpl drag, snap, nesting, or rendering bug."

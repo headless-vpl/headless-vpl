@@ -1,0 +1,4 @@
+interface:
+  display_name: "Update Docs"
+  short_description: "Sync docs and skills with current API changes"
+  default_prompt: "Use $update-docs to bring README, docs, and skills in sync with the current headless-vpl source."

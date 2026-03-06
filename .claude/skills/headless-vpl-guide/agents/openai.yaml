@@ -1,0 +1,4 @@
+interface:
+  display_name: "Headless VPL Guide"
+  short_description: "Explain current headless-vpl APIs and demos"
+  default_prompt: "Use $headless-vpl-guide to answer a question about the current headless-vpl API or samples."

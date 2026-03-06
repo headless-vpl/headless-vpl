@@ -1,0 +1,4 @@
+interface:
+  display_name: "Create VPL"
+  short_description: "Build current headless-vpl editors and demos"
+  default_prompt: "Use $create-vpl to scaffold or extend a headless-vpl editor from the current samples."
