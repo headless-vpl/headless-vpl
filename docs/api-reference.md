@@ -845,7 +845,7 @@ animate((deltaTime, frame) => {
 ### 当たり判定
 
 ```typescript
-import { isCollision } from 'headless-vpl/util/collision_detecion'
+import { isCollision } from 'headless-vpl/util/collision_detection'
 
 const hit = isCollision(container, worldMousePos)  // AABB 点-矩形テスト
 ```

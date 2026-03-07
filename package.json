@@ -9,13 +9,29 @@
     ".": {
       "import": "./dist/headless-vpl.js",
       "types": "./dist/index.d.ts"
+    },
+    "./util/mouse": {
+      "import": "./dist/util/mouse.js",
+      "types": "./dist/util/mouse.d.ts"
+    },
+    "./util/animate": {
+      "import": "./dist/util/animate.js",
+      "types": "./dist/util/animate.d.ts"
+    },
+    "./util/dnd": {
+      "import": "./dist/util/dnd.js",
+      "types": "./dist/util/dnd.d.ts"
+    },
+    "./util/collision_detection": {
+      "import": "./dist/util/collision_detection.js",
+      "types": "./dist/util/collision_detection.d.ts"
+    },
+    "./util/domController": {
+      "import": "./dist/util/domController.js",
+      "types": "./dist/util/domController.d.ts"
     }
   },
-  "files": [
-    "dist",
-    "LICENSE",
-    "README.md"
-  ],
+  "files": ["dist", "LICENSE", "README.md"],
   "license": "MIT",
   "keywords": [
     "visual-programming",
