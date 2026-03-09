@@ -1,16 +1,24 @@
-import { BlockStackController, findConnectorInsertHit } from '../../../lib/headless-vpl/blocks';
+import {
+  BlockStackController,
+  collectConnectedChain,
+  findConnectorInsertHit,
+} from '../../../lib/headless-vpl/blocks';
 import type { AutoLayout, Connector, Container } from '../../../lib/headless-vpl';
 import {
   type BodyLayoutHit,
   type CBlockRef,
   type CreatedBlock,
   C_HEADER_H,
+  C_BODY_MIN_H,
   C_W,
+  INLINE_GAP,
+  INLINE_HEIGHT_PADDING,
+  INLINE_PADDING_X,
   getBlockSize,
+  getInputValue,
   inputWidth,
   estimateTextWidth,
   isCBlockShape,
-  isInlineValueShape,
 } from './defs';
 
 const blockStack = new BlockStackController();
@@ -124,109 +132,136 @@ export function findCBlockRefForBodyLayout(
   return null;
 }
 
+function syncDetachedStackFollowers(root: Container): void {
+  const chain = collectConnectedChain(root);
+  if (chain.length < 2) return;
+
+  let anchor = chain[0];
+  for (let i = 1; i < chain.length; i += 1) {
+    const follower = chain[i];
+    if (follower.parentAutoLayout) break;
+    follower.move(anchor.position.x, anchor.position.y + anchor.height);
+    anchor = follower;
+  }
+}
+
 export function relayoutSlotsAndFitBlock(block: CreatedBlock): void {
-  const { def } = block.state;
+  const { def, inputValues } = block.state;
   const isCBlock = isCBlockShape(def.shape);
-  const isInlineValue = isInlineValueShape(def.shape);
-  if (!isCBlock && !isInlineValue) return;
-
-  if (block.slotLayouts.length === 0) {
-    if (isCBlock && block.cBlockRef) {
-      alignCBlockBodyEntryConnectors(block.cBlockRef);
-    }
-    return;
-  }
-
-  const SLOT_PADDING_X = 12;
-  const SLOT_GAP = 6;
-  const SLOT_BASE_H = 24;
-
-  for (const { layout } of block.slotLayouts) {
-    layout.update();
-  }
-
+  const baseSize = getBlockSize(def.shape);
   const slotByIndex = new Map(block.slotLayouts.map((slot) => [slot.info.inputIndex, slot]));
-  const baseHeaderHeight = isCBlock ? C_HEADER_H : getBlockSize(def.shape).h;
 
-  let headerHeight = baseHeaderHeight;
-  for (const { layout } of block.slotLayouts) {
-    const usedHeight = Math.max(SLOT_BASE_H, layout.height);
-    headerHeight = Math.max(headerHeight, usedHeight + 8);
+  let maxInlineHeight = 0;
+  for (const slot of block.slotLayouts) {
+    const input = def.inputs[slot.info.inputIndex];
+    const baseWidth = inputWidth(input, getInputValue(input, block.state, slot.info.inputIndex));
+    slot.info.w = baseWidth;
+    slot.layout.minWidth = baseWidth;
+    slot.layout.minHeight = slot.info.h;
+    slot.layout.update();
+    maxInlineHeight = Math.max(maxInlineHeight, Math.max(slot.info.h, slot.layout.height));
   }
-  headerHeight = Math.ceil(headerHeight);
 
-  let cursor = SLOT_PADDING_X + estimateTextWidth(def.name) + (def.name ? SLOT_GAP : 0);
+  const baseHeaderHeight = isCBlock ? C_HEADER_H : baseSize.h;
+  const headerHeight = Math.ceil(
+    Math.max(baseHeaderHeight, maxInlineHeight > 0 ? maxInlineHeight + INLINE_HEIGHT_PADDING : 0),
+  );
+
+  let cursor = INLINE_PADDING_X + estimateTextWidth(def.name) + (def.name ? INLINE_GAP : 0);
 
   for (let i = 0; i < def.inputs.length; i += 1) {
     const input = def.inputs[i];
-    const baseWidth = inputWidth(input);
+    const baseWidth = inputWidth(input, inputValues[i]);
 
     if (input.type === 'label') {
-      cursor += baseWidth + SLOT_GAP;
+      cursor += baseWidth + INLINE_GAP;
       continue;
     }
 
     const slot = slotByIndex.get(i);
     if (!slot) {
-      cursor += baseWidth + SLOT_GAP;
+      cursor += baseWidth + INLINE_GAP;
       continue;
     }
 
     const usedWidth = Math.max(baseWidth, slot.layout.width);
-    const usedHeight = Math.max(SLOT_BASE_H, slot.layout.height);
+    const usedHeight = Math.max(slot.info.h, slot.layout.height);
     slot.layout.position.x = cursor;
     slot.layout.position.y = (headerHeight - usedHeight) / 2;
     slot.layout.relayout();
-    cursor += usedWidth + SLOT_GAP;
+    cursor += usedWidth + INLINE_GAP;
   }
 
   const requiredWidth = Math.max(
-    getBlockSize(def.shape).w,
-    Math.ceil(cursor + SLOT_PADDING_X - SLOT_GAP),
+    baseSize.w,
+    Math.ceil(cursor + INLINE_PADDING_X - (def.inputs.length > 0 ? INLINE_GAP : 0)),
   );
+  const requiredHeight = Math.max(baseSize.h, headerHeight);
 
   if (isCBlock) {
     const container = block.container;
-    container.widthMode = 'hug';
     container.minWidth = C_W;
     container.padding.top = headerHeight;
 
-    if (!block.cBlockRef) {
-      container.width = requiredWidth;
-      container.update();
-      container.parentAutoLayout?.update();
-      return;
-    }
-
-    const innerWidth = Math.max(
+    const innerMinWidth = Math.max(
       C_W - container.padding.left - container.padding.right,
       requiredWidth - container.padding.left - container.padding.right,
     );
 
-    for (let i = 0; i < block.cBlockRef.bodyLayouts.length; i += 1) {
-      const layout = block.cBlockRef.bodyLayouts[i];
-      layout.position.x = container.padding.left;
-      if (i === 0) layout.position.y = container.padding.top;
-      layout.minWidth = innerWidth;
+    if (block.cBlockRef) {
+      const minimumBodyHeight =
+        block.cBlockRef.bodyLayouts.length * C_BODY_MIN_H +
+        container.contentGap * Math.max(0, block.cBlockRef.bodyLayouts.length - 1);
+      container.minHeight = Math.max(
+        baseSize.h,
+        container.padding.top + minimumBodyHeight + container.padding.bottom,
+      );
+
+      for (let i = 0; i < block.cBlockRef.bodyLayouts.length; i += 1) {
+        const layout = block.cBlockRef.bodyLayouts[i];
+        layout.position.x = container.padding.left;
+        if (i === 0) layout.position.y = container.padding.top;
+        layout.minWidth = innerMinWidth;
+        layout.minHeight = C_BODY_MIN_H;
+      }
+
+      let contentWidth = innerMinWidth;
+      for (const layout of block.cBlockRef.bodyLayouts) {
+        layout.update();
+        contentWidth = Math.max(contentWidth, layout.width);
+      }
+      container.applyContentSize(contentWidth, minimumBodyHeight);
+      alignCBlockBodyEntryConnectors(block.cBlockRef);
+    } else {
+      container.minHeight = Math.max(
+        baseSize.h,
+        container.padding.top + C_BODY_MIN_H + container.padding.bottom,
+      );
+      const changed =
+        container.width !== requiredWidth || container.height !== requiredHeight;
+      container.width = requiredWidth;
+      container.height = requiredHeight;
+      if (changed) {
+        container.update();
+        container.parentAutoLayout?.update();
+      }
     }
-
-    block.cBlockRef.bodyLayouts[0]?.update();
-    alignCBlockBodyEntryConnectors(block.cBlockRef);
-    return;
-  }
-
-  const container = block.container;
-  container.widthMode = 'hug';
-  container.heightMode = 'hug';
-  container.minWidth = getBlockSize(def.shape).w;
-  container.minHeight = getBlockSize(def.shape).h;
-  const requiredHeight = Math.max(container.minHeight, Math.ceil(headerHeight));
-
-  if (container.width !== requiredWidth || container.height !== requiredHeight) {
+  } else {
+    const container = block.container;
+    container.minWidth = baseSize.w;
+    container.minHeight = baseSize.h;
+    const changed =
+      container.width !== requiredWidth || container.height !== requiredHeight;
     container.width = requiredWidth;
     container.height = requiredHeight;
-    container.update();
-    container.parentAutoLayout?.update();
+    if (changed) {
+      container.update();
+      container.parentAutoLayout?.update();
+    }
+  }
+
+  if (!block.container.parentAutoLayout) {
+    syncDetachedStackFollowers(block.container);
   }
 }
 

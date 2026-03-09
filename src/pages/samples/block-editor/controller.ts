@@ -5,6 +5,7 @@ import type {
   SnapConnection,
   Workspace,
 } from '../../../lib/headless-vpl';
+import { collectConnectedChain } from '../../../lib/headless-vpl/blocks';
 import { observeContainerContentSizes } from '../../../lib/headless-vpl/blocks';
 import type {
   BlockState,
@@ -37,6 +38,10 @@ import {
   resetEditorWorkspace,
   seedInitialCBlockNest,
 } from './scene';
+import {
+  collectFrontGroup,
+  sortContainersForNestedRender,
+} from './ordering';
 
 export type BlockEditorSnapshot = {
   blocks: BlockState[];
@@ -89,14 +94,21 @@ export class BlockEditorController {
       const owner = findCBlockRefForBodyLayout(zone.layout, this.cBlockRefs);
       if (owner) {
         alignCBlockBodyEntryConnectors(owner);
+        relayoutBlockAndAncestors(owner.container.id, this.createdMap);
+      } else {
+        this.bumpRevision();
       }
-      this.bumpRevision();
     }
 
     const slotInfo = this.slotZoneMap.get(zone);
     if (slotInfo) {
       relayoutBlockAndAncestors(slotInfo.blockId, this.createdMap);
       this.setNestedSlot(slotInfo.blockId, slotInfo.inputIndex, container.id);
+    }
+
+    const emitted = this.syncRenderOrder();
+    if (!emitted) {
+      this.bumpRevision();
     }
   };
 
@@ -109,14 +121,21 @@ export class BlockEditorController {
       const owner = findCBlockRefForBodyLayout(zone.layout, this.cBlockRefs);
       if (owner) {
         alignCBlockBodyEntryConnectors(owner);
+        relayoutBlockAndAncestors(owner.container.id, this.createdMap);
+      } else {
+        this.bumpRevision();
       }
-      this.bumpRevision();
     }
 
     const slotInfo = this.slotZoneMap.get(zone);
     if (slotInfo) {
       relayoutBlockAndAncestors(slotInfo.blockId, this.createdMap);
       this.setNestedSlot(slotInfo.blockId, slotInfo.inputIndex, null);
+    }
+
+    const emitted = this.syncRenderOrder();
+    if (!emitted) {
+      this.bumpRevision();
     }
   };
 
@@ -125,6 +144,9 @@ export class BlockEditorController {
     nestingZones: this.nestingZones,
     onNest: this.handleNest,
     onUnnest: this.handleUnnest,
+    onContainerPointerDown: (container) => {
+      this.bringChainToFront(container.id);
+    },
   };
 
   readonly subscribe = (listener: () => void) => {
@@ -140,8 +162,31 @@ export class BlockEditorController {
     return this.createdMap.get(blockId)?.container;
   }
 
+  getCreatedBlock(blockId: string): CreatedBlock | undefined {
+    return this.createdMap.get(blockId);
+  }
+
   getCBlockRef(blockId: string): CBlockRef | undefined {
     return this.cBlockRefMap.get(blockId);
+  }
+
+  updateInputValue(blockId: string, inputIndex: number, value: string): void {
+    const block = this.createdMap.get(blockId);
+    if (!block) return;
+    if (block.state.inputValues[inputIndex] === value) return;
+    block.state.inputValues[inputIndex] = value;
+    relayoutBlockAndAncestors(blockId, this.createdMap);
+    this.bumpRevision();
+  }
+
+  reset(): void {
+    if (!this.workspace) return;
+    const workspace = this.workspace;
+    const containers = this.containers;
+    this.unmount(workspace);
+    this.workspace = workspace;
+    this.containers = containers;
+    this.rebuildScene(workspace, containers);
   }
 
   mount(workspace: Workspace, containers: Container[]): () => void {
@@ -152,6 +197,22 @@ export class BlockEditorController {
     this.unmount();
     this.workspace = workspace;
     this.containers = containers;
+    this.rebuildScene(workspace, containers);
+
+    return () => this.unmount(workspace);
+  }
+
+  private rebuildScene(workspace: Workspace, containers: Container[]): void {
+    this.containers = containers;
+
+    if (this.proximityFrameId) {
+      cancelAnimationFrame(this.proximityFrameId);
+      this.proximityFrameId = 0;
+    }
+    this.stopConnectionSync?.();
+    this.stopConnectionSync = null;
+    this.stopSizeObservers?.();
+    this.stopSizeObservers = null;
 
     resetEditorWorkspace(
       workspace,
@@ -204,12 +265,16 @@ export class BlockEditorController {
     ]);
     seedInitialCBlockNest(scene.repeat1, [scene.moveInRepeat, scene.turnInRepeat]);
 
-    this.setBlocks(scene.created.map((block) => block.state));
+    this.syncRenderOrder();
     this.stopConnectionSync = subscribeCBlockConnectionSync(
       workspace,
       this.containerMap,
       this.cBlockRefs,
-      () => this.bumpRevision(),
+      () => {
+        relayoutCreatedBlocks(Array.from(this.createdMap.values()));
+        this.syncRenderOrder();
+        this.bumpRevision();
+      },
     );
     this.stopSizeObservers = observeContainerContentSizes({
       items: scene.created,
@@ -218,8 +283,6 @@ export class BlockEditorController {
         document.getElementById(`node-${block.state.id}`) as HTMLElement | null,
     });
     this.startProximityLoop();
-
-    return () => this.unmount(workspace);
   }
 
   unmount(expectedWorkspace?: Workspace): void {
@@ -308,6 +371,32 @@ export class BlockEditorController {
     this.activeBodyProximityIds.clear();
   }
 
+  private syncRenderOrder(): boolean {
+    return this.applyRenderOrder(sortContainersForNestedRender(this.containers));
+  }
+
+  private applyRenderOrder(nextContainers: Container[]): boolean {
+    const nextBlocks = nextContainers.flatMap((container) => {
+      const state = this.createdMap.get(container.id)?.state;
+      return state ? [state] : [];
+    });
+
+    const containersChanged =
+      nextContainers.length !== this.containers.length ||
+      nextContainers.some((container, index) => container !== this.containers[index]);
+    const blocksChanged =
+      nextBlocks.length !== this.snapshot.blocks.length ||
+      nextBlocks.some((block, index) => block !== this.snapshot.blocks[index]);
+
+    if (!containersChanged && !blocksChanged) {
+      return false;
+    }
+
+    this.containers.splice(0, this.containers.length, ...nextContainers);
+    this.setBlocks(nextBlocks);
+    return true;
+  }
+
   private setBlocks(blocks: BlockState[]): void {
     this.snapshot = {
       ...this.snapshot,
@@ -352,6 +441,26 @@ export class BlockEditorController {
       ...this.snapshot,
     };
     this.emit();
+  }
+
+  private bringChainToFront(blockId: string): void {
+    const root = this.containerMap.get(blockId);
+    if (!root || this.containers.length === 0 || this.snapshot.blocks.length === 0) {
+      return;
+    }
+
+    const chain = collectConnectedChain(root);
+    const group = collectFrontGroup(this.containers, chain);
+    const groupIds = new Set(group.map((container) => container.id));
+    if (groupIds.size === 0) {
+      return;
+    }
+
+    const nextContainers = this.containers.filter(
+      (container) => !groupIds.has(container.id),
+    );
+    nextContainers.push(...group);
+    this.applyRenderOrder(nextContainers);
   }
 
   private emit(): void {

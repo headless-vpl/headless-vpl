@@ -12,8 +12,10 @@ import {
   type CBlockRef,
   type CreatedBlock,
   type SampleScene,
+  type SlotLayoutRef,
   type SlotZoneMeta,
   BLOCK_DEFS,
+  BOOLEAN_CONNECTOR_HIT_RADIUS,
   C_BODY_ENTRY_HIT_RADIUS,
   C_BODY_ENTRY_OFFSET_X,
   C_BODY_ENTRY_OFFSET_Y,
@@ -25,11 +27,11 @@ import {
   C_W,
   CONN_OFFSET_X,
   computeSlotPositions,
+  createInitialInputValues,
   getBlockSize,
   hasBottomConnector,
   hasTopConnector,
   isCBlockShape,
-  isInlineValueShape,
 } from './defs';
 import {
   alignCBlockBodyEntryConnectors,
@@ -44,6 +46,11 @@ export function createBlock(
 ): CreatedBlock {
   const { w, h } = getBlockSize(def.shape);
   const isCBlock = isCBlockShape(def.shape);
+  const state = {
+    id: '',
+    def,
+    inputValues: createInitialInputValues(def.inputs),
+  };
 
   const topConn = hasTopConnector(def.shape)
     ? new Connector({
@@ -67,9 +74,23 @@ export function createBlock(
       })
     : null;
 
+  const valueConnector =
+    def.shape === 'boolean'
+      ? new Connector({
+          name: 'value',
+          type: 'output',
+          hitRadius: BOOLEAN_CONNECTOR_HIT_RADIUS,
+          anchor: {
+            target: 'parent',
+            origin: 'center-right',
+          },
+        })
+      : null;
+
   const children: Record<string, Connector | AutoLayout> = {};
   if (topConn) children.top = topConn;
   if (bottomConn) children.bottom = bottomConn;
+  if (valueConnector) children.value = valueConnector;
 
   const bodyLayouts: AutoLayout[] = [];
   const bodyEntryConnectors: Connector[] = [];
@@ -136,8 +157,8 @@ export function createBlock(
     }
   }
 
-  const slotPositions = computeSlotPositions(def);
-  const slotLayouts: { info: (typeof slotPositions)[number]; layout: AutoLayout }[] = [];
+  const slotPositions = computeSlotPositions(def, state.inputValues);
+  const slotLayouts: SlotLayoutRef[] = [];
   for (const slot of slotPositions) {
     const slotLayout = new AutoLayout({
       position: new Position(slot.x, slot.y),
@@ -150,7 +171,25 @@ export function createBlock(
       resizesParent: false,
     });
     children[`slot${slot.inputIndex}`] = slotLayout;
-    slotLayouts.push({ info: slot, layout: slotLayout });
+
+    const slotConnector =
+      slot.acceptedShapes.length === 1 && slot.acceptedShapes[0] === 'boolean'
+        ? new Connector({
+            name: `slot-connector-${slot.inputIndex}`,
+            type: 'input',
+            hitRadius: BOOLEAN_CONNECTOR_HIT_RADIUS,
+            anchor: {
+              target: slotLayout,
+              origin: 'center-right',
+            },
+          })
+        : null;
+
+    if (slotConnector) {
+      children[`slotConnector${slot.inputIndex}`] = slotConnector;
+    }
+
+    slotLayouts.push({ info: slot, layout: slotLayout, connector: slotConnector });
   }
 
   const container = new Container({
@@ -166,16 +205,17 @@ export function createBlock(
     color: def.color,
     width: w,
     height: h,
-    widthMode: isCBlock || isInlineValueShape(def.shape) ? 'hug' : 'fixed',
-    heightMode: isCBlock || isInlineValueShape(def.shape) ? 'hug' : 'fixed',
+    widthMode: 'hug',
+    heightMode: 'hug',
     padding: isCBlock
       ? { top: C_HEADER_H, bottom: C_FOOTER_H, left: 16, right: 16 }
       : undefined,
-    minWidth: isCBlock || isInlineValueShape(def.shape) ? w : undefined,
-    minHeight: isCBlock || isInlineValueShape(def.shape) ? h : undefined,
+    minWidth: w,
+    minHeight: h,
     contentGap: def.shape === 'c-block-else' ? C_DIVIDER_H : undefined,
     children,
   });
+  state.id = container.id;
 
   let cBlockRef: CBlockRef | null = null;
   if (isCBlock) {
@@ -194,7 +234,8 @@ export function createBlock(
     bottomConn,
     cBlockRef,
     slotLayouts,
-    state: { id: container.id, def },
+    valueConnector,
+    state,
   };
 }
 
@@ -264,6 +305,19 @@ export function buildSampleScene(ws: Workspace, containers: Container[]): Sample
   make(21, 580, 860);
   make(20, 580, 900);
   make(22, 580, 940);
+  make(23, 860, 30);
+  make(24, 860, 92);
+  make(25, 860, 144);
+  make(26, 860, 204);
+  make(27, 860, 274);
+  make(28, 860, 334);
+  make(29, 860, 394);
+  make(30, 860, 454);
+  make(31, 860, 514);
+  make(32, 860, 584);
+  make(33, 860, 654);
+  make(34, 860, 714);
+  make(35, 860, 774);
 
   return {
     created,
