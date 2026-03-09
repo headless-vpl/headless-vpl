@@ -56,7 +56,7 @@ import {
   getBezierPath,
   getStepPath,
   getSmoothStepPath,
-} from 'headless-vpl'
+} from 'headless-vpl/primitives'
 
 const { path, labelPosition } = getBezierPath(
   { x: 0, y: 0 },

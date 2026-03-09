@@ -2,6 +2,11 @@
 
 ブロック型とフロー型を組み合わせた全く新しい VPL を構築する例です。これは Headless VPL ならではの機能です。
 
+## 現在の対応状況
+
+- sample には inspector、scene persistence、mixed palette を追加済みです。
+- Showcase 全体の進捗一覧: [Showcase Roadmap](./showcase-roadmap.md)
+
 ## コンセプト
 
 - ブロック同士は **スナップ** で上下に結合（Scratch スタイル）
@@ -9,12 +14,17 @@
 
 ```typescript
 import {
-  Workspace, Container, Connector, Edge, Position,
-  SvgRenderer, InteractionManager, SnapConnection, EdgeBuilder,
-  bindWheelZoom, bindDefaultShortcuts,
-} from 'headless-vpl'
-import { getMouseState } from 'headless-vpl/util/mouse'
-import { animate } from 'headless-vpl/util/animate'
+  Workspace,
+  Container,
+  Connector,
+  Edge,
+  Position,
+  SvgRenderer,
+} from 'headless-vpl/primitives'
+import { EdgeBuilder, SnapConnection, bindWheelZoom } from 'headless-vpl/helpers'
+import { InteractionManager, bindDefaultShortcuts } from 'headless-vpl/recipes'
+import { getMouseState } from 'headless-vpl/utils/mouse'
+import { animate } from 'headless-vpl/utils/animate'
 
 const workspace = new Workspace()
 const svg = document.querySelector('#workspace') as SVGSVGElement

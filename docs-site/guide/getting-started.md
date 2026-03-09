@@ -8,7 +8,7 @@ npm install headless-vpl
 
 ## 最小構成
 
-ドラッグ可能な 2 ノードをエッジで接続する最小構成です。
+まずは primitives だけで 2 ノードを作り、エッジで接続する最小構成です。
 
 ```typescript
 import {
@@ -18,12 +18,7 @@ import {
   Edge,
   Position,
   SvgRenderer,
-  InteractionManager,
-  bindWheelZoom,
-  bindDefaultShortcuts,
-} from 'headless-vpl'
-import { getMouseState } from 'headless-vpl/util/mouse'
-import { animate } from 'headless-vpl/util/animate'
+} from 'headless-vpl/primitives'
 
 // 1. ワークスペース + レンダラー
 const workspace = new Workspace()
@@ -55,30 +50,15 @@ const nodeB = new Container({
 
 // 3. エッジで接続
 new Edge({ start: nodeA.children.output, end: nodeB.children.input, edgeType: 'bezier' })
+```
 
-// 4. インタラクション
-const canvasEl = svg.parentElement as HTMLElement
-const containers = [nodeA, nodeB]
+インタラクションを追加したくなったら、次の層を足します。
 
-const interaction = new InteractionManager({
-  workspace,
-  canvasElement: canvasEl,
-  containers: () => containers,
-})
-
-const mouse = getMouseState(canvasEl, {
-  mousedown: (_bs, mp, ev) => interaction.handlePointerDown(mp, ev),
-  mouseup: (_bs, mp) => interaction.handlePointerUp(mp),
-})
-
-// 5. ホイールズーム + キーボードショートカット
-bindWheelZoom(canvasEl, { workspace })
-bindDefaultShortcuts({ workspace, element: document.body, containers: () => containers })
-
-// 6. アニメーションループ
-animate(() => {
-  interaction.tick(mouse.mousePosition, mouse.buttonState)
-})
+```typescript
+import { EdgeBuilder, NestingZone, SnapConnection, bindWheelZoom } from 'headless-vpl/helpers'
+import { InteractionManager, bindDefaultShortcuts } from 'headless-vpl/recipes'
+import { getMouseState } from 'headless-vpl/utils/mouse'
+import { animate } from 'headless-vpl/utils/animate'
 ```
 
 ## 次のステップ

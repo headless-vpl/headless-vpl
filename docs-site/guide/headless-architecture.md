@@ -29,7 +29,7 @@ Headless VPL はレンダリングに一切制約を設けません。
 
 ## DomSyncHelper
 
-`DomSyncHelper` を使って Headless VPL の座標系と DOM 要素の位置を自動同期できます。
+`DomSyncHelper` は helper 層にあり、Headless VPL の座標系と DOM 要素の位置を自動同期できます。
 
 ```typescript
 const domSync = new DomSyncHelper({

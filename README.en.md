@@ -60,12 +60,13 @@ Minimal example — two draggable nodes connected by an edge:
 
 ```typescript
 import {
-  Workspace, Container, Connector, Edge, Position,
-  SvgRenderer, InteractionManager,
-  DomSyncHelper, bindWheelZoom, bindDefaultShortcuts,
-} from 'headless-vpl'
-import { getMouseState } from 'headless-vpl/util/mouse'
-import { animate } from 'headless-vpl/util/animate'
+  Workspace,
+  Container,
+  Connector,
+  Edge,
+  Position,
+  SvgRenderer,
+} from 'headless-vpl/primitives'
 
 // 1. Create workspace + renderer
 const workspace = new Workspace()
@@ -96,30 +97,24 @@ const nodeB = new Container({
 // 3. Connect with edge
 new Edge({ start: nodeA.children.output, end: nodeB.children.input, edgeType: 'bezier' })
 
-// 4. Interaction (DnD + pan + marquee + resize)
-const canvasEl = svg.parentElement as HTMLElement
-const containers = [nodeA, nodeB]
-
-const interaction = new InteractionManager({
-  workspace,
-  canvasElement: canvasEl,
-  containers: () => containers,
-})
-
-const mouse = getMouseState(canvasEl, {
-  mousedown: (_bs, mp, ev) => interaction.handlePointerDown(mp, ev),
-  mouseup: (_bs, mp) => interaction.handlePointerUp(mp),
-})
-
-// 5. Wheel zoom + keyboard shortcuts
-bindWheelZoom(canvasEl, { workspace })
-bindDefaultShortcuts({ workspace, element: document.body, containers: () => containers })
-
-// 6. Animation loop
-animate(() => {
-  interaction.tick(mouse.mousePosition, mouse.buttonState)
-})
 ```
+
+Add helpers and recipes only when you want higher-level behavior:
+
+```typescript
+import { EdgeBuilder, NestingZone, SnapConnection, bindWheelZoom } from 'headless-vpl/helpers'
+import { InteractionManager, bindDefaultShortcuts } from 'headless-vpl/recipes'
+import { getMouseState } from 'headless-vpl/utils/mouse'
+import { animate } from 'headless-vpl/utils/animate'
+```
+
+### Recommended Import Tiers
+
+- `headless-vpl/primitives` for low-level core building blocks
+- `headless-vpl/helpers` for opt-in convenience helpers
+- `headless-vpl/recipes` for integrated setup/orchestration
+- `headless-vpl/blocks` for block-editor helpers
+- `headless-vpl/utils/*` for mouse / animation-loop I/O helpers
 
 ---
 
@@ -131,7 +126,7 @@ Every VPL can be decomposed into four universal patterns:
 |---|---|---|
 | **Rendering** | Responsive sizing, auto layout | `Container`, `AutoLayout`, `SvgRenderer` |
 | **Connection** | Connectors, edges, parent-child | `Connector`, `Edge`, `SnapConnection` |
-| **Movement** | Drag & drop, snap, group move | `DragAndDrop`, `SnapConnection`, `InteractionManager` |
+| **Movement** | Drag & drop, snap, group move | `DragAndDrop`, `NestingZone`, `SnapConnection` |
 | **Input** | Text, numbers, toggles, sliders | Your own DOM (framework-agnostic) |
 
 ### Unidirectional Data Flow
@@ -210,7 +205,9 @@ workspace.selection.deselectAll()
 | [`MoveCommand`](./docs/api-reference.md#組み込みコマンド) | Record moves |
 | [`AddCommand`](./docs/api-reference.md#組み込みコマンド) / [`RemoveCommand`](./docs/api-reference.md#組み込みコマンド) | Record add/remove |
 | [`ConnectCommand`](./docs/api-reference.md#組み込みコマンド) | Record connections |
+| [`DetachCommand`](./docs/api-reference.md#組み込みコマンド) | Record detachment |
 | [`NestCommand`](./docs/api-reference.md#組み込みコマンド) | Record nesting |
+| [`ReparentChildCommand`](./docs/api-reference.md#組み込みコマンド) | Record child reparenting |
 | [`BatchCommand`](./docs/api-reference.md#組み込みコマンド) | Batch multiple commands |
 
 ```typescript
@@ -229,15 +226,13 @@ workspace.history.redo()
 new SvgRenderer(svgElement, workspace)
 ```
 
-### Utilities
+### Helpers
 
 | API | Description |
 |---|---|
-| [`InteractionManager`](./docs/api-reference.md#interactionmanager) | Unified DnD, pan, marquee, resize, edge creation |
-| [`DragAndDrop`](./docs/api-reference.md#draganddrop) | Drag & drop |
-| [`SnapConnection`](./docs/api-reference.md#snapconnection) | Snap connection manager |
+| [`SnapConnection`](./docs/api-reference.md#snapconnection) / [`createSnapConnections`](./docs/api-reference.md#createsnapconnections) | Snap connection manager / batch creation |
 | [`EdgeBuilder`](./docs/api-reference.md#edgebuilder) | Build edges by dragging |
-| [`NestingZone`](./docs/api-reference.md#nestingzone) | Nesting into AutoLayout |
+| [`NestingZone`](./docs/api-reference.md#nestingzone) / [`createSlotZone`](./docs/api-reference.md#createslotzone) | Nesting into AutoLayout |
 | [`DomSyncHelper`](./docs/api-reference.md#domsynchelper) | Container → DOM position sync |
 | [`bindWheelZoom`](./docs/api-reference.md#bindwheelzoom) | Wheel zoom binding |
 | [`bindDefaultShortcuts`](./docs/api-reference.md#binddefaultshortcuts) | Default keyboard shortcuts |
@@ -247,10 +242,21 @@ new SvgRenderer(svgElement, workspace)
 | [`detectResizeHandle`](./docs/api-reference.md#リサイズ) | Resize handle detection |
 | [`createMarqueeRect`](./docs/api-reference.md#マーキー選択) | Marquee box selection |
 | [`snapToGrid`](./docs/api-reference.md#グリッドスナップ) | Grid snapping |
-| [`copyElements`](./docs/api-reference.md#クリップボード) / [`pasteElements`](./docs/api-reference.md#クリップボード) | Copy/paste |
+| [`copyElements`](./docs/api-reference.md#クリップボード) / [`pasteElements`](./docs/api-reference.md#クリップボード) / [`calculatePastePositions`](./docs/api-reference.md#クリップボード) | Copy/paste |
 | [`screenToWorld`](./docs/api-reference.md#ビューポート) / [`worldToScreen`](./docs/api-reference.md#ビューポート) | Coordinate transforms |
+| [`getStraightPath`](./docs/api-reference.md#edge-パス) / [`getBezierPath`](./docs/api-reference.md#edge-パス) / [`getStepPath`](./docs/api-reference.md#edge-パス) / [`getSmoothStepPath`](./docs/api-reference.md#edge-パス) | Edge path algorithms |
+ 
+### Recipes / Blocks
+
+| API | Description |
+|---|---|
+| [`InteractionManager`](./docs/api-reference.md#interactionmanager) | High-level orchestrator for DnD, pan, marquee, resize, and edge creation |
+| [`bindDefaultShortcuts`](./docs/api-reference.md#binddefaultshortcuts) | Default keyboard shortcut recipe |
+| [`BlockStackController`](./docs/api-reference.md#blockstackcontroller) / [`collectConnectedChain`](./docs/api-reference.md#collectconnectedchain) / [`connectStackPairs`](./docs/api-reference.md#connectstackpairs) | Block-type VPL helpers |
+| [`observeContainerContentSizes`](./docs/api-reference.md#observecontainercontentsizes) | Batch DOM size observation for containers |
 
 ```typescript
+// Recipe-layer integration
 const interaction = new InteractionManager({
   workspace,
   canvasElement: canvasEl,
@@ -275,8 +281,9 @@ const interaction = new InteractionManager({
 | `IPosition` | `{ x: number, y: number }` |
 | `Viewport` | `{ x: number, y: number, scale: number }` |
 | `VplEvent` | `{ type, target, data? }` |
-| `VplEventType` | `'move' \| 'connect' \| 'disconnect' \| ...` |
+| `VplEventType` | `'move' \| 'connect' \| 'disconnect' \| 'nest' \| 'unnest' \| 'proximity' \| ...` |
 | `SizingMode` | `'fixed' \| 'hug' \| 'fill'` |
+| `Padding` | `{ top, right, bottom, left }` |
 | `EdgeType` | `'straight' \| 'bezier' \| 'step' \| 'smoothstep'` |
 | `Command` | `{ execute(): void, undo(): void }` |
 | `InteractionMode` | `'idle' \| 'panning' \| 'dragging' \| 'marquee' \| 'resizing' \| 'edgeBuilding'` |
