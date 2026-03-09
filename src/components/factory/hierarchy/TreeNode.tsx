@@ -1,5 +1,3 @@
-import { useState } from 'react'
-
 export type DropPosition = 'before' | 'on' | 'after'
 
 export type TreeItem = {
@@ -15,6 +13,12 @@ type TreeNodeProps = {
   item: TreeItem
   depth: number
   selectedId: string | null
+  isExpanded: (id: string) => boolean
+  isHidden: (id: string) => boolean
+  isLocked: (id: string) => boolean
+  onToggleExpand: (id: string, expanded: boolean) => void
+  onToggleHidden: (id: string) => void
+  onToggleLocked: (id: string) => void
   onSelect: (item: TreeItem) => void
   dragItemId: string | null
   dragTargetId: string | null
@@ -35,7 +39,45 @@ const TYPE_ICONS: Record<string, string> = {
   edge: '\u2192',
 }
 
-/** マウスY座標からドロップ位置を判定（中央を広めに確保してネストしやすくする） */
+function VisibilityIcon({ hidden }: { hidden: boolean }) {
+  if (hidden) {
+    return (
+      <svg width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2'>
+        <path d='M3 3l18 18' />
+        <path d='M10.6 10.6a3 3 0 0 0 4.2 4.2' />
+        <path d='M9.9 5.2A10.7 10.7 0 0 1 12 5c7 0 10 7 10 7a17.2 17.2 0 0 1-3.1 4.2' />
+        <path d='M6.2 6.3A17.7 17.7 0 0 0 2 12s3 7 10 7a9.8 9.8 0 0 0 4.1-.9' />
+      </svg>
+    )
+  }
+
+  return (
+    <svg width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2'>
+      <path d='M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z' />
+      <circle cx='12' cy='12' r='3' />
+    </svg>
+  )
+}
+
+function LockIcon({ locked }: { locked: boolean }) {
+  if (locked) {
+    return (
+      <svg width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2'>
+        <rect x='4' y='11' width='16' height='10' rx='2' />
+        <path d='M8 11V8a4 4 0 1 1 8 0v3' />
+      </svg>
+    )
+  }
+
+  return (
+    <svg width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2'>
+      <rect x='4' y='11' width='16' height='10' rx='2' />
+      <path d='M8 11V8a4 4 0 0 1 7.2-2.4' />
+      <path d='M18 11V8' />
+    </svg>
+  )
+}
+
 export function calcDropPosition(e: React.DragEvent, element: HTMLElement): DropPosition {
   const rect = element.getBoundingClientRect()
   const y = e.clientY - rect.top
@@ -49,6 +91,12 @@ export function TreeNode({
   item,
   depth,
   selectedId,
+  isExpanded,
+  isHidden,
+  isLocked,
+  onToggleExpand,
+  onToggleHidden,
+  onToggleLocked,
   onSelect,
   dragItemId,
   dragTargetId,
@@ -61,10 +109,13 @@ export function TreeNode({
   isDragActive,
   droppableIds,
 }: TreeNodeProps) {
-  const [expanded, setExpanded] = useState(true)
+  const expanded = isExpanded(item.id)
+  const hidden = isHidden(item.id)
+  const locked = isLocked(item.id)
   const hasChildren = item.children.length > 0
   const isSelected = item.id === selectedId
-  const isDraggable = item.type === 'container' || item.type === 'connector' || item.type === 'autolayout'
+  const isDraggable =
+    !locked && (item.type === 'container' || item.type === 'connector' || item.type === 'autolayout')
   const isDragging = dragItemId === item.id
   const isDropTarget = dragTargetId === item.id
   const isDroppable = isDragActive && droppableIds.has(item.id)
@@ -72,6 +123,8 @@ export function TreeNode({
   const classNames = [
     'factory-tree-node',
     isSelected ? 'factory-tree-node-selected' : '',
+    hidden ? 'factory-tree-node-hidden' : '',
+    locked ? 'factory-tree-node-locked' : '',
     isDragging ? 'dragging' : '',
     isDroppable && !isDropTarget ? 'factory-tree-node-droppable' : '',
     isDropTarget && dropPosition === 'on' ? 'factory-tree-drop-target' : '',
@@ -100,7 +153,7 @@ export function TreeNode({
             className='factory-tree-toggle'
             onClick={(e) => {
               e.stopPropagation()
-              setExpanded(!expanded)
+              onToggleExpand(item.id, !expanded)
             }}
           >
             <svg
@@ -118,13 +171,32 @@ export function TreeNode({
         ) : (
           <span className='factory-tree-toggle-spacer' />
         )}
-        <span
-          className='factory-tree-icon'
-          style={{ color: item.color || 'var(--color-text-secondary)' }}
-        >
+        <span className='factory-tree-icon' style={{ color: item.color || 'var(--color-text-secondary)' }}>
           {TYPE_ICONS[item.type] || '\u25A0'}
         </span>
         <span className='factory-tree-label'>{item.name}</span>
+        <span className='factory-tree-actions'>
+          <span
+            className='factory-tree-action'
+            onClick={(e) => {
+              e.stopPropagation()
+              onToggleHidden(item.id)
+            }}
+            title={hidden ? 'Show item' : 'Hide item'}
+          >
+            <VisibilityIcon hidden={hidden} />
+          </span>
+          <span
+            className='factory-tree-action'
+            onClick={(e) => {
+              e.stopPropagation()
+              onToggleLocked(item.id)
+            }}
+            title={locked ? 'Unlock item' : 'Lock item'}
+          >
+            <LockIcon locked={locked} />
+          </span>
+        </span>
       </button>
       {isDropTarget && dropPosition === 'after' && (
         <div className='factory-tree-drop-indicator' style={{ marginLeft: depth * 16 }} />
@@ -137,6 +209,12 @@ export function TreeNode({
               item={child}
               depth={depth + 1}
               selectedId={selectedId}
+              isExpanded={isExpanded}
+              isHidden={isHidden}
+              isLocked={isLocked}
+              onToggleExpand={onToggleExpand}
+              onToggleHidden={onToggleHidden}
+              onToggleLocked={onToggleLocked}
               onSelect={onSelect}
               dragItemId={dragItemId}
               dragTargetId={dragTargetId}

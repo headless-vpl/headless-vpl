@@ -1,13 +1,13 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { MovableObject } from '../../../lib/headless-vpl/core/MovableObject'
 import type Workspace from '../../../lib/headless-vpl/core/Workspace'
-import { MoveCommand, worldToScreen } from '../../../lib/headless-vpl'
-import { useFactory } from '../../../contexts/FactoryContext'
+import { MoveCommand, MoveManyCommand, worldToScreen } from '../../../lib/headless-vpl/primitives'
 
 type DragAxis = 'x' | 'y' | 'free'
 
 type MoveGizmoProps = {
   element: MovableObject
+  selectionItems: MovableObject[]
   workspace: Workspace
   onMoveEnd: () => void
 }
@@ -22,27 +22,73 @@ const COLOR_X = '#ef4444'
 const COLOR_Y = '#22c55e'
 const COLOR_FREE = '#3b82f6'
 
-export function MoveGizmo({ element, workspace, onMoveEnd }: MoveGizmoProps) {
-  const { revision } = useFactory()
+export function MoveGizmo({
+  element,
+  selectionItems,
+  workspace,
+  onMoveEnd,
+}: MoveGizmoProps) {
   const [hoveredAxis, setHoveredAxis] = useState<DragAxis | null>(null)
+  const rootRef = useRef<HTMLDivElement | null>(null)
   const draggingRef = useRef<DragAxis | null>(null)
   const dragStartRef = useRef({ x: 0, y: 0 })
-  const elementStartRef = useRef({ x: 0, y: 0 })
+  const elementStartsRef = useRef<Map<string, { x: number; y: number }>>(new Map())
 
-  // 要素中心のスクリーン座標を計算（キャンバスローカル座標）
-  const getScreenPos = useCallback(() => {
+  const dragTargets = selectionItems.length > 0 ? selectionItems : [element]
+
+  const getWorldCenter = useCallback(() => {
+    if (dragTargets.length > 1) {
+      let minX = Number.POSITIVE_INFINITY
+      let minY = Number.POSITIVE_INFINITY
+      let maxX = Number.NEGATIVE_INFINITY
+      let maxY = Number.NEGATIVE_INFINITY
+
+      for (const item of dragTargets) {
+        const width = 'width' in item ? item.width : 0
+        const height = 'height' in item ? item.height : 0
+        minX = Math.min(minX, item.position.x)
+        minY = Math.min(minY, item.position.y)
+        maxX = Math.max(maxX, item.position.x + width)
+        maxY = Math.max(maxY, item.position.y + height)
+      }
+
+      return {
+        x: minX + Math.max(0, maxX - minX) / 2,
+        y: minY + Math.max(0, maxY - minY) / 2,
+      }
+    }
+
     const hasSize = 'width' in element && 'height' in element
-    const worldCenter = hasSize
+    return hasSize
       ? {
           x: element.position.x + (element as { width: number }).width / 2,
           y: element.position.y + (element as { height: number }).height / 2,
         }
       : { x: element.position.x, y: element.position.y }
-    return worldToScreen(worldCenter, workspace.viewport)
-  }, [element, workspace])
+  }, [dragTargets, element])
 
-  // revision が変わるたびに位置を再計算（内部的にはレンダーで反映）
-  const screenPos = getScreenPos()
+  const syncPosition = useCallback(() => {
+    const root = rootRef.current
+    if (!root) return
+    const screenPos = worldToScreen(getWorldCenter(), workspace.viewport)
+    root.style.transform = `translate(${screenPos.x - CENTER}px, ${screenPos.y - CENTER}px)`
+  }, [getWorldCenter, workspace])
+
+  useLayoutEffect(() => {
+    syncPosition()
+  }, [syncPosition])
+
+  useEffect(() => {
+    const unsubs = [
+      workspace.on('move', syncPosition),
+      workspace.on('pan', syncPosition),
+      workspace.on('zoom', syncPosition),
+      workspace.on('update', syncPosition),
+    ]
+    return () => {
+      for (const unsubscribe of unsubs) unsubscribe()
+    }
+  }, [syncPosition, workspace])
 
   const handleMouseDown = useCallback(
     (axis: DragAxis, e: React.MouseEvent) => {
@@ -50,9 +96,11 @@ export function MoveGizmo({ element, workspace, onMoveEnd }: MoveGizmoProps) {
       e.preventDefault()
       draggingRef.current = axis
       dragStartRef.current = { x: e.clientX, y: e.clientY }
-      elementStartRef.current = { x: element.position.x, y: element.position.y }
+      elementStartsRef.current = new Map(
+        dragTargets.map((item) => [item.id, { x: item.position.x, y: item.position.y }])
+      )
     },
-    [element]
+    [dragTargets]
   )
 
   useEffect(() => {
@@ -64,15 +112,15 @@ export function MoveGizmo({ element, workspace, onMoveEnd }: MoveGizmoProps) {
       const dx = (e.clientX - dragStartRef.current.x) / scale
       const dy = (e.clientY - dragStartRef.current.y) / scale
 
-      let newX = elementStartRef.current.x
-      let newY = elementStartRef.current.y
-
-      if (axis === 'x' || axis === 'free') newX += dx
-      if (axis === 'y' || axis === 'free') newY += dy
-
-      element.move(newX, newY)
-      // syncState は onMoveEnd で呼ぶが、リアルタイム追従のためにイベント発火
-      workspace.eventBus.emit('move', element)
+      for (const item of dragTargets) {
+        const start = elementStartsRef.current.get(item.id)
+        if (!start) continue
+        let nextX = start.x
+        let nextY = start.y
+        if (axis === 'x' || axis === 'free') nextX += dx
+        if (axis === 'y' || axis === 'free') nextY += dy
+        item.move(nextX, nextY)
+      }
     }
 
     const handleMouseUp = () => {
@@ -80,22 +128,18 @@ export function MoveGizmo({ element, workspace, onMoveEnd }: MoveGizmoProps) {
       if (!axis) return
       draggingRef.current = null
 
-      const fromX = elementStartRef.current.x
-      const fromY = elementStartRef.current.y
-      const toX = element.position.x
-      const toY = element.position.y
+      const commands = dragTargets.flatMap((item) => {
+        const start = elementStartsRef.current.get(item.id)
+        if (!start) return []
+        if (start.x === item.position.x && start.y === item.position.y) return []
+        return [new MoveCommand(item, start.x, start.y, item.position.x, item.position.y)]
+      })
 
-      // 実際に移動があった場合のみコマンド登録
-      if (fromX !== toX || fromY !== toY) {
-        // 現在位置に既に移動済みなので、execute で再度移動しないようインラインコマンドを使う
-        workspace.history.execute({
-          execute() {
-            element.move(toX, toY)
-          },
-          undo() {
-            element.move(fromX, fromY)
-          },
-        })
+      if (commands.length === 1) {
+        workspace.history.execute(commands[0])
+        onMoveEnd()
+      } else if (commands.length > 1) {
+        workspace.history.execute(new MoveManyCommand(commands))
         onMoveEnd()
       }
     }
@@ -106,7 +150,7 @@ export function MoveGizmo({ element, workspace, onMoveEnd }: MoveGizmoProps) {
       window.removeEventListener('mousemove', handleMouseMove)
       window.removeEventListener('mouseup', handleMouseUp)
     }
-  }, [element, workspace, onMoveEnd])
+  }, [dragTargets, onMoveEnd, workspace])
 
   const isActive = (axis: DragAxis) => draggingRef.current === axis
   const isHovered = (axis: DragAxis) => hoveredAxis === axis && !draggingRef.current
@@ -117,27 +161,17 @@ export function MoveGizmo({ element, workspace, onMoveEnd }: MoveGizmoProps) {
   const yOpacity = isHovered('y') || isActive('y') ? 1 : 0.8
   const freeOpacity = isHovered('free') || isActive('free') ? 1 : 0.8
 
-  // X軸矢印: 中央から右へ
   const xShaftEnd = CENTER + ARROW_LENGTH
   const xHeadTip = xShaftEnd + HEAD_SIZE
-
-  // Y軸矢印: 中央から上へ (SVG Y軸は下向き)
   const yShaftEnd = CENTER - ARROW_LENGTH
   const yHeadTip = yShaftEnd - HEAD_SIZE
 
   return (
     <div
+      ref={rootRef}
       className='factory-move-gizmo'
-      style={{
-        transform: `translate(${screenPos.x - CENTER}px, ${screenPos.y - CENTER}px)`,
-      }}
     >
-      <svg
-        width={SVG_SIZE}
-        height={SVG_SIZE}
-        viewBox={`0 0 ${SVG_SIZE} ${SVG_SIZE}`}
-      >
-        {/* X軸: 赤 */}
+      <svg width={SVG_SIZE} height={SVG_SIZE} viewBox={`0 0 ${SVG_SIZE} ${SVG_SIZE}`}>
         <g opacity={xOpacity}>
           <line
             x1={CENTER + 10}
@@ -153,7 +187,6 @@ export function MoveGizmo({ element, workspace, onMoveEnd }: MoveGizmoProps) {
             fill={COLOR_X}
           />
         </g>
-        {/* X軸ヒットエリア */}
         <rect
           x={CENTER + 8}
           y={CENTER - 8}
@@ -166,7 +199,6 @@ export function MoveGizmo({ element, workspace, onMoveEnd }: MoveGizmoProps) {
           onMouseDown={(e) => handleMouseDown('x', e)}
         />
 
-        {/* Y軸: 緑 */}
         <g opacity={yOpacity}>
           <line
             x1={CENTER}
@@ -182,7 +214,6 @@ export function MoveGizmo({ element, workspace, onMoveEnd }: MoveGizmoProps) {
             fill={COLOR_Y}
           />
         </g>
-        {/* Y軸ヒットエリア */}
         <rect
           x={CENTER - 8}
           y={yHeadTip}
@@ -195,7 +226,6 @@ export function MoveGizmo({ element, workspace, onMoveEnd }: MoveGizmoProps) {
           onMouseDown={(e) => handleMouseDown('y', e)}
         />
 
-        {/* 中央ハンドル: 青 */}
         <rect
           x={CENTER - CENTER_SIZE / 2}
           y={CENTER - CENTER_SIZE / 2}

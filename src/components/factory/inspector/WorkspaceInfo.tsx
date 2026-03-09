@@ -1,7 +1,7 @@
 import { useFactory } from '../../../contexts/FactoryContext'
 
 export function WorkspaceInfo() {
-  const { workspace, elementCount, edgeCount, zoom } = useFactory()
+  const { workspace, elementCount, edgeCount, zoom, autosaveState, hiddenIds, lockedIds } = useFactory()
 
   return (
     <div className='factory-props-section'>
@@ -18,6 +18,18 @@ export function WorkspaceInfo() {
         <div className='factory-info-row'>
           <span>Zoom</span>
           <span>{zoom}%</span>
+        </div>
+        <div className='factory-info-row'>
+          <span>Autosave</span>
+          <span>{autosaveState}</span>
+        </div>
+        <div className='factory-info-row'>
+          <span>Hidden</span>
+          <span>{hiddenIds.size}</span>
+        </div>
+        <div className='factory-info-row'>
+          <span>Locked</span>
+          <span>{lockedIds.size}</span>
         </div>
         {workspace && (
           <>
