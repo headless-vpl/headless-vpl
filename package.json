@@ -9,13 +9,53 @@
     ".": {
       "import": "./dist/headless-vpl.js",
       "types": "./dist/index.d.ts"
+    },
+    "./primitives": {
+      "import": "./dist/primitives.js",
+      "types": "./dist/primitives.d.ts"
+    },
+    "./helpers": {
+      "import": "./dist/helpers.js",
+      "types": "./dist/helpers.d.ts"
+    },
+    "./recipes": {
+      "import": "./dist/recipes.js",
+      "types": "./dist/recipes.d.ts"
+    },
+    "./blocks": {
+      "import": "./dist/blocks.js",
+      "types": "./dist/blocks.d.ts"
+    },
+    "./util/mouse": {
+      "import": "./dist/util/mouse.js",
+      "types": "./dist/util/mouse.d.ts"
+    },
+    "./util/animate": {
+      "import": "./dist/util/animate.js",
+      "types": "./dist/util/animate.d.ts"
+    },
+    "./util/dnd": {
+      "import": "./dist/util/dnd.js",
+      "types": "./dist/util/dnd.d.ts"
+    },
+    "./util/collision_detecion": {
+      "import": "./dist/util/collision_detecion.js",
+      "types": "./dist/util/collision_detecion.d.ts"
+    },
+    "./util/domController": {
+      "import": "./dist/util/domController.js",
+      "types": "./dist/util/domController.d.ts"
+    },
+    "./utils/mouse": {
+      "import": "./dist/util/mouse.js",
+      "types": "./dist/util/mouse.d.ts"
+    },
+    "./utils/animate": {
+      "import": "./dist/util/animate.js",
+      "types": "./dist/util/animate.d.ts"
     }
   },
-  "files": [
-    "dist",
-    "LICENSE",
-    "README.md"
-  ],
+  "files": ["dist", "LICENSE", "README.md"],
   "license": "MIT",
   "keywords": [
     "visual-programming",
@@ -34,6 +74,7 @@
     "build": "vite build",
     "build:site": "vite build && vitepress build docs-site",
     "build:lib": "vite build --config vite.lib.config.ts && tsc -p tsconfig.lib.json",
+    "check:exports": "npm run build:lib && node scripts/check-package-exports.mjs",
     "prepublishOnly": "npm run build:lib",
     "typecheck": "tsc -p tsconfig.lib.json --noEmit",
     "lint": "biome check .",

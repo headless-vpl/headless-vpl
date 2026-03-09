@@ -15,6 +15,19 @@ export function generateId(prefix = 'vpl'): string {
   return `${prefix}_${_nextId++}`
 }
 
+export function syncGeneratedIdCounter(ids: readonly string[]): void {
+  let maxId = _nextId - 1
+  for (const id of ids) {
+    const match = /_(\d+)$/.exec(id)
+    if (!match) continue
+    const numericId = Number.parseInt(match[1], 10)
+    if (Number.isFinite(numericId)) {
+      maxId = Math.max(maxId, numericId)
+    }
+  }
+  _nextId = Math.max(_nextId, maxId + 1)
+}
+
 /**
  * Workspace 上に配置される要素の共通インターフェース。
  * MovableObject と AutoLayout が共有するプロパティを統一する。

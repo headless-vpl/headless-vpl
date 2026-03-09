@@ -1,6 +1,9 @@
-import { type Container, type Position, getDistance } from '../../headless-vpl'
+import type Container from '../core/Container'
+import type { IPosition } from '../core/Position'
+import type Position from '../core/Position'
 import type Workspace from '../core/Workspace'
 import { generateId } from '../core/types'
+import { getDistance } from './distance'
 import { type getMouseState, getPositionDelta } from './mouse'
 
 /**
@@ -8,18 +11,126 @@ import { type getMouseState, getPositionDelta } from './mouse'
  */
 export type ConnectionValidator = () => boolean
 
+export type SnapRelationDetachReason = 'fail' | 'separated' | 'destroy'
+
+export type SnapAttachment = {
+  source: Container
+  sourcePosition: Position
+  target: Container
+  targetPosition: Position
+  workspace: Workspace
+}
+
+export type SnapHitTarget = {
+  hitRadius?: number
+}
+
+export function computeSnapDistance(sourcePosition: IPosition, targetPosition: IPosition): number {
+  return getDistance(sourcePosition, targetPosition)
+}
+
+export function isWithinSnapDistance(
+  sourcePosition: IPosition,
+  targetPosition: IPosition,
+  snapDistance: number
+): boolean {
+  return computeSnapDistance(sourcePosition, targetPosition) < snapDistance
+}
+
+export function computeSnapDelta(sourcePosition: IPosition, targetPosition: IPosition): IPosition {
+  return getPositionDelta(sourcePosition, targetPosition)
+}
+
+export function computeConnectorSnapDistance(
+  source: SnapHitTarget,
+  target: SnapHitTarget,
+  fallbackHitRadius = 12
+): number {
+  return (source.hitRadius ?? fallbackHitRadius) + (target.hitRadius ?? fallbackHitRadius)
+}
+
+export function canSnap(mouseState: getMouseState, validator?: ConnectionValidator): boolean {
+  if (mouseState.buttonState.leftButton !== 'up') {
+    return false
+  }
+  return !validator || validator()
+}
+
+export function applySnapDelta(source: Container, delta: IPosition): void {
+  source.move(source.position.x - delta.x, source.position.y - delta.y)
+}
+
+export function isSnapConnectionActive(source: Container, target: Container): boolean {
+  return source.Parent === target || target.Children.has(source)
+}
+
+function scrubSourceFromUnexpectedParents(
+  source: Container,
+  workspace: Workspace,
+  expectedParent: Container | null
+): void {
+  for (const element of workspace.elements) {
+    if (!element || typeof element !== 'object' || !('Children' in element)) continue
+    if (expectedParent && element === expectedParent) continue
+    const maybeParent = element as { Children?: Set<Container> }
+    if (!(maybeParent.Children instanceof Set)) continue
+    maybeParent.Children.delete(source)
+  }
+
+  source.Parent = expectedParent
+  if (expectedParent) {
+    expectedParent.Children.add(source)
+  }
+}
+
+export function attachSnapRelation({
+  source,
+  sourcePosition,
+  target,
+  targetPosition,
+  workspace,
+}: SnapAttachment): void {
+  const currentParent = source.Parent as Container | null
+  if (currentParent && currentParent !== target) {
+    workspace.eventBus.emit('disconnect', source, {
+      parent: currentParent.id,
+      child: source.id,
+    })
+  }
+
+  scrubSourceFromUnexpectedParents(source, workspace, target)
+  workspace.eventBus.emit('connect', source, {
+    parent: target.id,
+    child: source.id,
+    sourcePosition,
+    targetPosition,
+  })
+}
+
+export function detachSnapRelation(
+  attachment: SnapAttachment,
+  reason: SnapRelationDetachReason
+): boolean {
+  const { source, sourcePosition, target, targetPosition, workspace } = attachment
+  const hasParentLink = source.Parent === target
+  const hasChildLink = target.Children.has(source)
+  if (!hasParentLink && !hasChildLink) return false
+
+  scrubSourceFromUnexpectedParents(source, workspace, null)
+
+  if (reason !== 'destroy') {
+    workspace.eventBus.emit('disconnect', source, {
+      parent: target.id,
+      child: source.id,
+      sourcePosition,
+      targetPosition,
+    })
+  }
+  return true
+}
+
 /**
  * 指定されたソースとターゲットのコネクタ間で、ソースコンテナを動かしてスナップを試みます。
- *
- * @param source ソースコンテナ（スナップ対象）
- * @param sourcePosition ソースの座標
- * @param targetPosition ターゲットの座標
- * @param mouseState 現在のマウス状態。左ボタンが 'up' の場合にのみスナップを試みる。
- * @param snapDistance スナップを発動する距離の閾値
- * @param onSnap スナップが成功した場合に実行するコールバック
- * @param onFail スナップが失敗した場合に実行するコールバック
- * @param validator 接続の可否を判定するバリデーター
- * @returns スナップが実行された場合は true を返します。
  */
 export function snap(
   source: Container,
@@ -31,35 +142,24 @@ export function snap(
   onFail?: () => void,
   validator?: ConnectionValidator
 ): boolean {
-  // マウスがリリース状態でなければ処理しない
   if (mouseState.buttonState.leftButton !== 'up') {
     return false
   }
 
-  // バリデーターが設定されていて false を返した場合は接続拒否
   if (validator && !validator()) {
     onFail?.()
     return false
   }
 
-  const sourceConnector = sourcePosition
-  const targetConnector = targetPosition
-
-  const distance = getDistance(sourceConnector, targetConnector)
-  if (distance < snapDistance) {
-    const delta = getPositionDelta(sourceConnector, targetConnector)
-    // source の位置を調整してスナップさせる
-    source.move(source.position.x - delta.x, source.position.y - delta.y)
-    onSnap?.()
-    return true
+  if (!isWithinSnapDistance(sourcePosition, targetPosition, snapDistance)) {
+    onFail?.()
+    return false
   }
 
-  // スナップが失敗した場合にコールバックを実行
-  onFail?.()
-  return false
+  applySnapDelta(source, computeSnapDelta(sourcePosition, targetPosition))
+  onSnap?.()
+  return true
 }
-
-// --- SnapStrategy ---
 
 /**
  * スナップを試みるかどうかの判定関数。
@@ -82,8 +182,6 @@ export const parentOnly: SnapStrategy = (_source, target, dragContainers) =>
 /** どちらが近づいてもスナップ */
 export const either: SnapStrategy = (source, target, dragContainers) =>
   dragContainers.includes(source) || dragContainers.includes(target)
-
-// --- SnapConnection ---
 
 export type SnapConnectionConfig = {
   source: Container
@@ -148,8 +246,7 @@ export function createSnapConnections<T>(config: CreateSnapConnectionsConfig<T>)
 }
 
 /**
- * スナップ接続の状態管理を統合するクラス。
- * snap() + SnapStrategy + Parent/Children 管理 + イベント発火をまとめる。
+ * スナップ接続の状態管理を統合する helper。
  */
 export class SnapConnection {
   readonly id: string
@@ -196,8 +293,7 @@ export class SnapConnection {
     if (this._destroyed) return
     this.clearProximity()
     this._destroyed = true
-    // 接続中ならクリア（locked状態に依存せず実際の参照で判定）
-    this.detachFromTarget('destroy')
+    detachSnapRelation(this.getAttachment(), 'destroy')
     this._locked = false
   }
 
@@ -230,7 +326,6 @@ export class SnapConnection {
       return
     }
 
-    // mouseup 時に dragContainers が空になるため、ドラッグ中の値を記憶する
     if (dragContainers.length > 0) {
       this._lastDragContainers = dragContainers
     }
@@ -245,8 +340,7 @@ export class SnapConnection {
       return
     }
 
-    // 近接判定
-    const distance = getDistance(this.sourcePosition, this.targetPosition)
+    const distance = computeSnapDistance(this.sourcePosition, this.targetPosition)
     if (distance < this.snapDistance && !this._inProximity) {
       this._inProximity = true
       this.workspace.eventBus.emit('proximity', this.source, {
@@ -280,7 +374,7 @@ export class SnapConnection {
    */
   lock(): void {
     if (this._destroyed) return
-    this.scrubSourceFromUnexpectedParents(this.target)
+    scrubSourceFromUnexpectedParents(this.source, this.workspace, this.target)
     this._locked = true
   }
 
@@ -289,56 +383,28 @@ export class SnapConnection {
     this._lastDragContainers = []
   }
 
-  private isConnected(): boolean {
-    return this.source.Parent === this.target || this.target.Children.has(this.source)
-  }
-
-  private scrubSourceFromUnexpectedParents(expectedParent: Container | null): void {
-    for (const element of this.workspace.elements) {
-      if (!element || typeof element !== 'object' || !('Children' in element)) continue
-      if (expectedParent && element === expectedParent) continue
-      const maybeParent = element as unknown as { Children?: Set<Container> }
-      if (!(maybeParent.Children instanceof Set)) continue
-      maybeParent.Children.delete(this.source)
+  private getAttachment(): SnapAttachment {
+    return {
+      source: this.source,
+      sourcePosition: this.sourcePosition,
+      target: this.target,
+      targetPosition: this.targetPosition,
+      workspace: this.workspace,
     }
-
-    this.source.Parent = expectedParent
-    if (expectedParent) {
-      expectedParent.Children.add(this.source)
-    }
-  }
-
-  private detachFromTarget(reason: 'fail' | 'separated' | 'destroy'): boolean {
-    const hasParentLink = this.source.Parent === this.target
-    const hasChildLink = this.target.Children.has(this.source)
-    if (!hasParentLink && !hasChildLink) return false
-
-    this.scrubSourceFromUnexpectedParents(null)
-
-    // destroy時以外はイベント通知
-    if (reason !== 'destroy') {
-      this.workspace.eventBus.emit('disconnect', this.source, {
-        parent: this.target.id,
-        child: this.source.id,
-        sourcePosition: this.sourcePosition,
-        targetPosition: this.targetPosition,
-      })
-    }
-    return true
   }
 
   private detachIfSeparated(): void {
     if (this._destroyed) return
-    if (!this.isConnected()) return
+    if (!isSnapConnectionActive(this.source, this.target)) return
 
-    const distance = getDistance(this.sourcePosition, this.targetPosition)
+    const distance = computeSnapDistance(this.sourcePosition, this.targetPosition)
     const detachThreshold = Math.max(
       this.minDetachDistance,
       this.snapDistance * this.detachDistanceRatio
     )
     if (distance <= detachThreshold) return
 
-    if (this.detachFromTarget('separated')) {
+    if (detachSnapRelation(this.getAttachment(), 'separated')) {
       this._locked = false
       this._hasFailed = true
       this._lastDragContainers = []
@@ -360,28 +426,13 @@ export class SnapConnection {
   }
 
   private onSnap(): void {
-    // 既存の親が別ターゲットなら先に切る（Children残骸を防ぐ）
-    const currentParent = this.source.Parent as Container | null
-    if (currentParent && currentParent !== this.target) {
-      this.workspace.eventBus.emit('disconnect', this.source, {
-        parent: currentParent.id,
-        child: this.source.id,
-      })
-    }
-
-    this.scrubSourceFromUnexpectedParents(this.target)
-    this.workspace.eventBus.emit('connect', this.source, {
-      parent: this.target.id,
-      child: this.source.id,
-      sourcePosition: this.sourcePosition,
-      targetPosition: this.targetPosition,
-    })
+    attachSnapRelation(this.getAttachment())
     this._hasFailed = false
   }
 
   private onFail(): void {
-    if (!this._hasFailed || this.isConnected()) {
-      if (this.detachFromTarget('fail')) {
+    if (!this._hasFailed || isSnapConnectionActive(this.source, this.target)) {
+      if (detachSnapRelation(this.getAttachment(), 'fail')) {
         this._locked = false
       }
       this._hasFailed = true

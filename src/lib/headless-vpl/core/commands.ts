@@ -32,6 +32,46 @@ export class MoveCommand implements Command {
   }
 }
 
+export class MoveManyCommand implements Command {
+  private commands: MoveCommand[]
+
+  constructor(commands: MoveCommand[]) {
+    this.commands = commands
+  }
+
+  execute(): void {
+    for (const command of this.commands) command.execute()
+  }
+
+  undo(): void {
+    for (let i = this.commands.length - 1; i >= 0; i -= 1) {
+      this.commands[i].undo()
+    }
+  }
+}
+
+export class UpdateElementCommand implements Command {
+  private executeFn: () => void
+  private undoFn: () => void
+  private onAfter?: () => void
+
+  constructor(config: { execute: () => void; undo: () => void; onAfter?: () => void }) {
+    this.executeFn = config.execute
+    this.undoFn = config.undo
+    this.onAfter = config.onAfter
+  }
+
+  execute(): void {
+    this.executeFn()
+    this.onAfter?.()
+  }
+
+  undo(): void {
+    this.undoFn()
+    this.onAfter?.()
+  }
+}
+
 /**
  * 要素追加コマンド。
  */
@@ -407,5 +447,67 @@ export class ReparentChildCommand implements Command {
 
     // 元の親に追加
     this.sourceContainer.addChild(this.sourceKey, this.child)
+  }
+}
+
+export class ReorderChildrenCommand implements Command {
+  private workspace: Workspace
+  private parent: MovableObject
+  private prevOrder: MovableObject[]
+  private nextOrder: MovableObject[]
+
+  constructor(workspace: Workspace, parent: MovableObject, nextOrder: MovableObject[]) {
+    this.workspace = workspace
+    this.parent = parent
+    this.prevOrder = [...parent.Children]
+    this.nextOrder = [...nextOrder]
+  }
+
+  private apply(order: MovableObject[]): void {
+    this.parent.Children.clear()
+    for (const child of order) {
+      child.Parent = this.parent
+      this.parent.Children.add(child)
+    }
+    this.workspace.eventBus.emit('update', this.parent)
+  }
+
+  execute(): void {
+    this.apply(this.nextOrder)
+  }
+
+  undo(): void {
+    this.apply(this.prevOrder)
+  }
+}
+
+export class ReorderAutoLayoutChildrenCommand implements Command {
+  private workspace: Workspace
+  private layout: AutoLayout
+  private prevOrder: Container[]
+  private nextOrder: Container[]
+
+  constructor(workspace: Workspace, layout: AutoLayout, nextOrder: Container[]) {
+    this.workspace = workspace
+    this.layout = layout
+    this.prevOrder = [...layout.Children]
+    this.nextOrder = [...nextOrder]
+  }
+
+  private apply(order: Container[]): void {
+    this.layout.Children.splice(0, this.layout.Children.length, ...order)
+    for (const child of this.layout.Children) {
+      child.parentAutoLayout = this.layout
+    }
+    this.layout.update()
+    this.workspace.eventBus.emit('update', this.layout)
+  }
+
+  execute(): void {
+    this.apply(this.nextOrder)
+  }
+
+  undo(): void {
+    this.apply(this.prevOrder)
   }
 }
