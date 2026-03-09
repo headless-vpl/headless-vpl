@@ -2,8 +2,8 @@ import { useRef, useState } from 'react'
 import { DebugPanel } from '../../components/DebugPanel'
 import { SampleLayout } from '../../components/SampleLayout'
 import { VplCanvas } from '../../components/VplCanvas'
-import { useWorkspace } from '../../hooks/useWorkspace'
-import { Connector, Container, Position } from '../../lib/headless-vpl'
+import { useRecipeWorkspace } from '../../hooks/workspace/useRecipeWorkspace'
+import { Connector, Container, Position } from '../../lib/headless-vpl/primitives'
 
 export default function CopyPasteDemo() {
   const svgRef = useRef<SVGSVGElement | null>(null)
@@ -12,7 +12,7 @@ export default function CopyPasteDemo() {
   const [nodeCount, setNodeCount] = useState(3)
   const [showGrid, setShowGrid] = useState(true)
 
-  const { workspaceRef, containersRef, ready } = useWorkspace(svgRef, overlayRef, canvasRef, {
+  const { workspaceRef, containersRef, ready } = useRecipeWorkspace(svgRef, overlayRef, canvasRef, {
     enableShortcuts: true,
     onPaste: (pasted) => setNodeCount((prev) => prev + pasted.length),
   })

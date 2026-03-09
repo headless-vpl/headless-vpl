@@ -2,8 +2,9 @@ import { useRef, useState } from 'react'
 import { DebugPanel } from '../../components/DebugPanel'
 import { SampleLayout } from '../../components/SampleLayout'
 import { VplCanvas } from '../../components/VplCanvas'
-import { useWorkspace } from '../../hooks/useWorkspace'
-import { Connector, Container, EdgeBuilder, Position } from '../../lib/headless-vpl'
+import { useRecipeWorkspace } from '../../hooks/workspace/useRecipeWorkspace'
+import { EdgeBuilder } from '../../lib/headless-vpl/helpers'
+import { Connector, Container, Position } from '../../lib/headless-vpl/primitives'
 
 export default function EdgeBuilderDemo() {
   const svgRef = useRef<SVGSVGElement | null>(null)
@@ -11,7 +12,7 @@ export default function EdgeBuilderDemo() {
   const canvasRef = useRef<HTMLDivElement | null>(null)
   const [showGrid, setShowGrid] = useState(true)
 
-  const { workspaceRef, containersRef, connectorsRef, interactionRef, ready } = useWorkspace(
+  const { workspaceRef, containersRef, connectorsRef, interactionRef, ready } = useRecipeWorkspace(
     svgRef,
     overlayRef,
     canvasRef,

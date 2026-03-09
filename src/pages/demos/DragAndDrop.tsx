@@ -2,8 +2,11 @@ import { useRef, useState } from 'react'
 import { SampleLayout } from '../../components/SampleLayout'
 import { DebugPanel } from '../../components/DebugPanel'
 import { VplCanvas } from '../../components/VplCanvas'
-import { useWorkspace } from '../../hooks/useWorkspace'
-import { Container, Position } from '../../lib/headless-vpl'
+import { useRecipeWorkspace } from '../../hooks/workspace/useRecipeWorkspace'
+import { Container, Position } from '../../lib/headless-vpl/primitives'
+import { getExampleByPath } from '../../data/examplesData'
+
+const exampleData = getExampleByPath('/demos/drag-and-drop')
 
 export default function DragAndDrop() {
   const svgRef = useRef<SVGSVGElement | null>(null)
@@ -11,7 +14,7 @@ export default function DragAndDrop() {
   const canvasRef = useRef<HTMLDivElement | null>(null)
   const [showGrid, setShowGrid] = useState(true)
 
-  const { workspaceRef, containersRef, ready } = useWorkspace(svgRef, overlayRef, canvasRef, {
+  const { workspaceRef, containersRef, ready } = useRecipeWorkspace(svgRef, overlayRef, canvasRef, {
     enableShortcuts: false,
   })
 
@@ -35,7 +38,7 @@ export default function DragAndDrop() {
   }
 
   return (
-    <SampleLayout title='Drag & Drop' description='コンテナをドラッグして移動。中ボタンでパン。' rightPanel={<DebugPanel workspaceRef={workspaceRef} containersRef={containersRef} svgRef={svgRef} overlayRef={overlayRef} showGrid={showGrid} onShowGridChange={setShowGrid} canvasRef={canvasRef} ready={ready} />}>
+    <SampleLayout title='Drag & Drop' description='コンテナをドラッグして移動。中ボタンでパン。' rightPanel={<DebugPanel workspaceRef={workspaceRef} containersRef={containersRef} svgRef={svgRef} overlayRef={overlayRef} showGrid={showGrid} onShowGridChange={setShowGrid} canvasRef={canvasRef} ready={ready} />} longDescription={exampleData?.longDescription} codeSnippet={exampleData?.codeSnippet}>
       <VplCanvas
         ref={(handle) => {
           if (handle) {

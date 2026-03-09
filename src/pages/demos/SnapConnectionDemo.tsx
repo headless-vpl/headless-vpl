@@ -2,8 +2,9 @@ import { useRef, useState } from 'react'
 import { DebugPanel } from '../../components/DebugPanel'
 import { SampleLayout } from '../../components/SampleLayout'
 import { VplCanvas } from '../../components/VplCanvas'
-import { useWorkspace } from '../../hooks/useWorkspace'
-import { Connector, Container, Position, SnapConnection, either } from '../../lib/headless-vpl'
+import { useRecipeWorkspace } from '../../hooks/workspace/useRecipeWorkspace'
+import { SnapConnection, computeConnectorSnapDistance, either } from '../../lib/headless-vpl/helpers'
+import { Connector, Container, Position } from '../../lib/headless-vpl/primitives'
 
 type BlockView = { id: string; name: string; color: string; width: number; height: number }
 
@@ -16,7 +17,7 @@ export default function SnapConnectionDemo() {
 
   const snapConnsRef = useRef<SnapConnection[]>([])
 
-  const { workspaceRef, containersRef, ready } = useWorkspace(svgRef, overlayRef, canvasRef, {
+  const { workspaceRef, containersRef, ready } = useRecipeWorkspace(svgRef, overlayRef, canvasRef, {
     enableShortcuts: false,
     interactionOverrides: { snapConnections: snapConnsRef.current },
   })
@@ -63,13 +64,27 @@ export default function SnapConnectionDemo() {
     const vBTop = (vBlocks[1].children as { top: Connector }).top
     const vABottom = (vBlocks[0].children as { bottom: Connector }).bottom
     snapConnsRef.current.push(
-      new SnapConnection({ source: vBlocks[1], sourcePosition: vBTop.position, target: vBlocks[0], targetPosition: vABottom.position, workspace: ws })
+      new SnapConnection({
+        source: vBlocks[1],
+        sourcePosition: vBTop.position,
+        target: vBlocks[0],
+        targetPosition: vABottom.position,
+        workspace: ws,
+        snapDistance: computeConnectorSnapDistance(vBTop, vABottom),
+      })
     )
     // C→B のスナップ
     const vCTop = (vBlocks[2].children as { top: Connector }).top
     const vBBottom = (vBlocks[1].children as { bottom: Connector }).bottom
     snapConnsRef.current.push(
-      new SnapConnection({ source: vBlocks[2], sourcePosition: vCTop.position, target: vBlocks[1], targetPosition: vBBottom.position, workspace: ws })
+      new SnapConnection({
+        source: vBlocks[2],
+        sourcePosition: vCTop.position,
+        target: vBlocks[1],
+        targetPosition: vBBottom.position,
+        workspace: ws,
+        snapDistance: computeConnectorSnapDistance(vCTop, vBBottom),
+      })
     )
 
     // --- パターン2: 横（left-right） ---
@@ -106,13 +121,27 @@ export default function SnapConnectionDemo() {
     const hBLeft = (hBlocks[1].children as { left: Connector }).left
     const hARight = (hBlocks[0].children as { right: Connector }).right
     snapConnsRef.current.push(
-      new SnapConnection({ source: hBlocks[1], sourcePosition: hBLeft.position, target: hBlocks[0], targetPosition: hARight.position, workspace: ws })
+      new SnapConnection({
+        source: hBlocks[1],
+        sourcePosition: hBLeft.position,
+        target: hBlocks[0],
+        targetPosition: hARight.position,
+        workspace: ws,
+        snapDistance: computeConnectorSnapDistance(hBLeft, hARight),
+      })
     )
     // C.left → B.right
     const hCLeft = (hBlocks[2].children as { left: Connector }).left
     const hBRight = (hBlocks[1].children as { right: Connector }).right
     snapConnsRef.current.push(
-      new SnapConnection({ source: hBlocks[2], sourcePosition: hCLeft.position, target: hBlocks[1], targetPosition: hBRight.position, workspace: ws })
+      new SnapConnection({
+        source: hBlocks[2],
+        sourcePosition: hCLeft.position,
+        target: hBlocks[1],
+        targetPosition: hBRight.position,
+        workspace: ws,
+        snapDistance: computeConnectorSnapDistance(hCLeft, hBRight),
+      })
     )
 
     // --- パターン3: 十字（4方向） ---
@@ -149,7 +178,17 @@ export default function SnapConnectionDemo() {
     containersRef.current.push(topBlock)
     blockViews.push({ id: topBlock.id, name: topBlock.name, color: topBlock.color, width: CW, height: CH })
     snapConnsRef.current.push(
-      new SnapConnection({ source: topBlock, sourcePosition: (topBlock.children as { bottom: Connector }).bottom.position, target: center, targetPosition: centerConn.top.position, workspace: ws })
+      new SnapConnection({
+        source: topBlock,
+        sourcePosition: (topBlock.children as { bottom: Connector }).bottom.position,
+        target: center,
+        targetPosition: centerConn.top.position,
+        workspace: ws,
+        snapDistance: computeConnectorSnapDistance(
+          (topBlock.children as { bottom: Connector }).bottom,
+          centerConn.top
+        ),
+      })
     )
 
     // 下
@@ -165,7 +204,17 @@ export default function SnapConnectionDemo() {
     containersRef.current.push(bottomBlock)
     blockViews.push({ id: bottomBlock.id, name: bottomBlock.name, color: bottomBlock.color, width: CW, height: CH })
     snapConnsRef.current.push(
-      new SnapConnection({ source: bottomBlock, sourcePosition: (bottomBlock.children as { top: Connector }).top.position, target: center, targetPosition: centerConn.bottom.position, workspace: ws })
+      new SnapConnection({
+        source: bottomBlock,
+        sourcePosition: (bottomBlock.children as { top: Connector }).top.position,
+        target: center,
+        targetPosition: centerConn.bottom.position,
+        workspace: ws,
+        snapDistance: computeConnectorSnapDistance(
+          (bottomBlock.children as { top: Connector }).top,
+          centerConn.bottom
+        ),
+      })
     )
 
     // 左
@@ -181,7 +230,17 @@ export default function SnapConnectionDemo() {
     containersRef.current.push(leftBlock)
     blockViews.push({ id: leftBlock.id, name: leftBlock.name, color: leftBlock.color, width: CW, height: CH })
     snapConnsRef.current.push(
-      new SnapConnection({ source: leftBlock, sourcePosition: (leftBlock.children as { right: Connector }).right.position, target: center, targetPosition: centerConn.left.position, workspace: ws })
+      new SnapConnection({
+        source: leftBlock,
+        sourcePosition: (leftBlock.children as { right: Connector }).right.position,
+        target: center,
+        targetPosition: centerConn.left.position,
+        workspace: ws,
+        snapDistance: computeConnectorSnapDistance(
+          (leftBlock.children as { right: Connector }).right,
+          centerConn.left
+        ),
+      })
     )
 
     // 右
@@ -197,7 +256,17 @@ export default function SnapConnectionDemo() {
     containersRef.current.push(rightBlock)
     blockViews.push({ id: rightBlock.id, name: rightBlock.name, color: rightBlock.color, width: CW, height: CH })
     snapConnsRef.current.push(
-      new SnapConnection({ source: rightBlock, sourcePosition: (rightBlock.children as { left: Connector }).left.position, target: center, targetPosition: centerConn.right.position, workspace: ws })
+      new SnapConnection({
+        source: rightBlock,
+        sourcePosition: (rightBlock.children as { left: Connector }).left.position,
+        target: center,
+        targetPosition: centerConn.right.position,
+        workspace: ws,
+        snapDistance: computeConnectorSnapDistance(
+          (rightBlock.children as { left: Connector }).left,
+          centerConn.right
+        ),
+      })
     )
 
     // --- パターン4: 双方向（either） ---
@@ -226,7 +295,15 @@ export default function SnapConnectionDemo() {
     const eBTop = (eBlocks[1].children as { top: Connector }).top
     const eABottom = (eBlocks[0].children as { bottom: Connector }).bottom
     snapConnsRef.current.push(
-      new SnapConnection({ source: eBlocks[1], sourcePosition: eBTop.position, target: eBlocks[0], targetPosition: eABottom.position, workspace: ws, strategy: either })
+      new SnapConnection({
+        source: eBlocks[1],
+        sourcePosition: eBTop.position,
+        target: eBlocks[0],
+        targetPosition: eABottom.position,
+        workspace: ws,
+        snapDistance: computeConnectorSnapDistance(eBTop, eABottom),
+        strategy: either,
+      })
     )
 
     setBlocks(blockViews)
