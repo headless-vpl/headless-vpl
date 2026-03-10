@@ -55,6 +55,7 @@
       "types": "./dist/util/animate.d.ts"
     }
   },
+  "packageManager": "bun@1.2.19",
   "files": ["dist", "LICENSE", "README.md"],
   "license": "MIT",
   "keywords": [

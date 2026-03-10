@@ -20,20 +20,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
+      - uses: oven-sh/setup-bun@v2
         with:
-          node-version: 22
-          cache: 'npm'
+          bun-version: 1.2.19
 
-      - run: npm ci
+      - run: bun install --frozen-lockfile
 
       # デモサイト（Vite）ビルド
       - name: Build demo site
-        run: npx vite build
+        run: bun run build
 
       # VitePress ドキュメントビルド
       - name: Build docs
-        run: npm run docs:build
+        run: bun run docs:build
 
       # 2つの出力を _site/ にマージ
       - name: Merge build outputs

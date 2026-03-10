@@ -334,13 +334,13 @@ const interaction = new InteractionManager({
 ## 開発
 
 ```bash
-npm install && npm run dev     # 開発サーバー起動
-npm run build                  # プロダクションビルド
-npm run build:lib              # ライブラリビルド
-npm run test                   # テスト実行
-npm run lint                   # リント
-npm run typecheck              # 型チェック
-npm run docs:dev               # ドキュメントサイト起動
+bun install && bun run dev     # 開発サーバー起動
+bun run build                  # プロダクションビルド
+bun run build:lib              # ライブラリビルド
+bun run test                   # テスト実行
+bun run lint                   # リント
+bun run typecheck              # 型チェック
+bun run docs:dev               # ドキュメントサイト起動
 ```
 
 ---

@@ -10,28 +10,28 @@ git clone https://github.com/headless-vpl/headless-vpl.git
 cd headless-vpl
 
 # 依存パッケージのインストール
-npm install
+bun install
 
 # Git hooks のインストール
-npx lefthook install
+bunx lefthook install
 
 # 開発サーバーの起動
-npm run dev
+bun run dev
 ```
 
 ## 主要コマンド
 
 | コマンド                | 説明                     |
 | ----------------------- | ------------------------ |
-| `npm run dev`           | 開発サーバー起動         |
-| `npm run build:lib`     | ライブラリビルド         |
-| `npm run test`          | テスト実行               |
-| `npm run test:watch`    | テスト（ウォッチモード） |
-| `npm run test:coverage` | カバレッジ付きテスト     |
-| `npm run lint`          | Biome によるリント       |
-| `npm run lint:fix`      | リント + 自動修正        |
-| `npm run format`        | コードフォーマット       |
-| `npm run typecheck`     | 型チェック               |
+| `bun run dev`           | 開発サーバー起動         |
+| `bun run build:lib`     | ライブラリビルド         |
+| `bun run test`          | テスト実行               |
+| `bun run test:watch`    | テスト（ウォッチモード） |
+| `bun run test:coverage` | カバレッジ付きテスト     |
+| `bun run lint`          | Biome によるリント       |
+| `bun run lint:fix`      | リント + 自動修正        |
+| `bun run format`        | コードフォーマット       |
+| `bun run typecheck`     | 型チェック               |
 
 ## ブランチ戦略
 
@@ -54,10 +54,10 @@ git checkout -b feat/add-auto-connect
 PR を出す前に以下が通ることを確認してください:
 
 ```bash
-npm run lint
-npm run typecheck
-npm run test
-npm run build:lib
+bun run lint
+bun run typecheck
+bun run test
+bun run build:lib
 ```
 
 ### 設計判断チェックリスト
@@ -77,7 +77,7 @@ npm run build:lib
 機能追加やバグ修正を含む PR には changeset を追加してください:
 
 ```bash
-npx changeset
+bunx changeset
 ```
 
 種類の選び方:
@@ -100,7 +100,7 @@ src/lib/headless-vpl/core/
 
 ```bash
 # 特定ファイルのテスト実行
-npx vitest run src/lib/headless-vpl/core/EventBus.test.ts
+bunx vitest run src/lib/headless-vpl/core/EventBus.test.ts
 ```
 
 ## コーディング規約
