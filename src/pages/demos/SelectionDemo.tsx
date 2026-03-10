@@ -2,8 +2,8 @@ import { useRef, useState } from 'react'
 import { DebugPanel } from '../../components/DebugPanel'
 import { SampleLayout } from '../../components/SampleLayout'
 import { VplCanvas } from '../../components/VplCanvas'
-import { useWorkspace } from '../../hooks/useWorkspace'
-import { Container, Position } from '../../lib/headless-vpl'
+import { useRecipeWorkspace } from '../../hooks/workspace/useRecipeWorkspace'
+import { Container, Position } from '../../lib/headless-vpl/primitives'
 
 export default function SelectionDemo() {
   const svgRef = useRef<SVGSVGElement | null>(null)
@@ -12,7 +12,7 @@ export default function SelectionDemo() {
   const [selectedCount, setSelectedCount] = useState(0)
   const [showGrid, setShowGrid] = useState(true)
 
-  const { workspaceRef, containersRef, ready } = useWorkspace(svgRef, overlayRef, canvasRef, {
+  const { workspaceRef, containersRef, ready } = useRecipeWorkspace(svgRef, overlayRef, canvasRef, {
     enableShortcuts: false,
   })
 

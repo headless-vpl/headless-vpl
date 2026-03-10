@@ -76,6 +76,13 @@ class Connector extends MovableObject {
     return dx * dx + dy * dy <= this.hitRadius * this.hitRadius
   }
 
+  public collidesWith(target: { position: IPosition; hitRadius?: number }): boolean {
+    const dx = target.position.x - this.position.x
+    const dy = target.position.y - this.position.y
+    const radius = this.hitRadius + (target.hitRadius ?? 0)
+    return dx * dx + dy * dy <= radius * radius
+  }
+
   private resolveAnchorPosition(owner?: Container): IPosition | null {
     if (!this.anchor) return null
 

@@ -1,7 +1,8 @@
 import { useCallback, useState } from 'react'
 import { FactoryProvider } from '../../contexts/FactoryContext'
 import { FactoryLayout } from '../../components/factory/FactoryLayout'
-import type { Workspace, Container, Connector, InteractionManager } from '../../lib/headless-vpl'
+import type { Connector, Container, Workspace } from '../../lib/headless-vpl/primitives'
+import type { InteractionManager } from '../../lib/headless-vpl/recipes'
 
 export default function Factory() {
   const [workspace, setWorkspace] = useState<Workspace | null>(null)

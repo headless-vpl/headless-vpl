@@ -2,18 +2,30 @@
 
 Scratch スタイルのブロック型 VPL を構築する例です。
 
+## 現在の対応状況
+
+- sample 専用仕様と対応マトリクス: [Block Editor Spec](./block-editor-spec.md)
+- Showcase 全体の進捗一覧: [Showcase Roadmap](./showcase-roadmap.md)
+- 現在の sample は editor / layout 実装が中心で、Scratch runtime 互換は含みません。
+- 最新版では inline input の可変幅、typed value slot、C-block body relayout を sample 仕様として固定しています。
+
 ## 基本構造
 
 ブロック型 VPL では、コネクターを上下に配置してスナップ接続で繋ぎます。
 
 ```typescript
 import {
-  Workspace, Container, Connector, Edge, Position,
-  SvgRenderer, InteractionManager, SnapConnection,
-  bindWheelZoom,
-} from 'headless-vpl'
-import { getMouseState } from 'headless-vpl/util/mouse'
-import { animate } from 'headless-vpl/util/animate'
+  Workspace,
+  Container,
+  Connector,
+  Edge,
+  Position,
+  SvgRenderer,
+} from 'headless-vpl/primitives'
+import { SnapConnection, bindWheelZoom } from 'headless-vpl/helpers'
+import { InteractionManager } from 'headless-vpl/recipes'
+import { getMouseState } from 'headless-vpl/utils/mouse'
+import { animate } from 'headless-vpl/utils/animate'
 
 const workspace = new Workspace()
 const svg = document.querySelector('#workspace') as SVGSVGElement

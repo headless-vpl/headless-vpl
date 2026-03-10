@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { VplCanvas } from '../../VplCanvas'
-import type { VplCanvasHandle } from '../../VplCanvas'
 import { useFactory } from '../../../contexts/FactoryContext'
-import { useWorkspace } from '../../../hooks/useWorkspace'
+import { useRecipeWorkspace } from '../../../hooks/workspace/useRecipeWorkspace'
 import { CanvasToolbar } from './CanvasToolbar'
 import { MoveGizmo } from './MoveGizmo'
 import {
@@ -10,21 +9,20 @@ import {
   Connector,
   Container,
   Edge,
-  EdgeBuilder,
-  NestingZone,
   Position,
   RemoveCommand,
   findNearestConnector,
-} from '../../../lib/headless-vpl'
+} from '../../../lib/headless-vpl/primitives'
+import { EdgeBuilder, NestingZone } from '../../../lib/headless-vpl/helpers'
 
 type CanvasNodeData = { id: string; name: string; w: number; h: number; color: string }
 
 type FactoryCanvasProps = {
   onWorkspaceReady: (args: {
-    workspace: ReturnType<typeof useWorkspace>['workspaceRef']['current']
+    workspace: ReturnType<typeof useRecipeWorkspace>['workspaceRef']['current']
     containers: Container[]
     connectors: Connector[]
-    interaction: ReturnType<typeof useWorkspace>['interactionRef']['current']
+    interaction: ReturnType<typeof useRecipeWorkspace>['interactionRef']['current']
     containersRef: React.RefObject<Container[]>
     connectorsRef: React.RefObject<Connector[]>
     svgRef: React.RefObject<SVGSVGElement | null>
@@ -39,24 +37,122 @@ export function FactoryCanvas({ onWorkspaceReady }: FactoryCanvasProps) {
   const canvasRef = useRef<HTMLDivElement | null>(null)
   const [nodes, setNodes] = useState<CanvasNodeData[]>([])
   const nestingZonesRef = useRef<NestingZone[]>([])
-  const { showGrid, showDebugSvg, placementMode, setPlacementMode, setSelectedElement, selectedElement, workspace: ctxWorkspace, toolMode, syncState } = useFactory()
+  const {
+    showGrid,
+    showDebugSvg,
+    placementMode,
+    setPlacementMode,
+    setSelectedElement,
+    selectedElement,
+    selectionItems,
+    workspace: ctxWorkspace,
+    toolMode,
+    syncState,
+    revision,
+    isHidden,
+    isLocked,
+    hiddenIds,
+    lockedIds,
+  } = useFactory()
+  const hiddenIdsRef = useRef(new Set<string>())
+  hiddenIdsRef.current = new Set(hiddenIds)
+  const lockedIdsRef = useRef(new Set<string>())
+  lockedIdsRef.current = new Set(lockedIds)
 
   // placementModeの最新値をrefで保持（useEffect内のクロージャから参照）
   const placementModeRef = useRef(placementMode)
   placementModeRef.current = placementMode
 
-  const { workspaceRef, containersRef, connectorsRef, interactionRef, ready } = useWorkspace(
+  const { workspaceRef, containersRef, connectorsRef, interactionRef, ready } = useRecipeWorkspace(
     svgRef,
     overlayRef,
     canvasRef,
     {
       enableShortcuts: true,
-      interactionOverrides: { nestingZones: nestingZonesRef.current },
+      createEdgeBuilder: (workspace, svgElement, previewPath) => {
+        const viewportGroup = svgElement.querySelector('[data-role="viewport"]') as SVGGElement
+        if (viewportGroup && !previewPath.parentNode) viewportGroup.appendChild(previewPath)
+        return new EdgeBuilder({
+          workspace,
+          edgeType: 'bezier',
+          onPreview: (path) => {
+            previewPath.setAttribute('d', path)
+            previewPath.setAttribute('display', 'block')
+          },
+          onComplete: (edge) => {
+            previewPath.setAttribute('display', 'none')
+            workspace.removeEdge(edge)
+            workspace.history.execute({
+              execute() {
+                workspace.addEdge(edge)
+              },
+              undo() {
+                workspace.removeEdge(edge)
+              },
+            })
+            setSelectedElement({ type: 'edge', element: edge })
+            syncState()
+          },
+          onCancel: () => {
+            previewPath.setAttribute('display', 'none')
+          },
+        })
+      },
+      interactionOverrides: {
+        nestingZones: nestingZonesRef.current,
+        isContainerVisible: (container) => !hiddenIdsRef.current.has(container.id),
+        isConnectorVisible: (connector) => !hiddenIdsRef.current.has(connector.id),
+        isContainerLocked: (container) => lockedIdsRef.current.has(container.id),
+        onContainerPointerDown: (container) => {
+          setSelectedElement({ type: 'container', element: container })
+        },
+        onEdgeSelect: (edgeId) => {
+          const edge = workspaceRef.current?.edges.find((item) => item.id === edgeId) as Edge | undefined
+          if (edge) {
+            setSelectedElement({ type: 'edge', element: edge })
+          }
+        },
+      },
       onTick: () => {
         // ノード状態を定期同期
       },
     }
   )
+
+  const collectHiddenDescendants = useCallback((container: Container, ids: Set<string>) => {
+    ids.add(container.id)
+    for (const child of Object.values(container.children)) {
+      ids.add(child.id)
+      if ('children' in child && 'color' in child) {
+        collectHiddenDescendants(child as Container, ids)
+      } else if ('direction' in child) {
+        const layout = child as AutoLayout
+        for (const nested of layout.Children) {
+          collectHiddenDescendants(nested, ids)
+        }
+      }
+    }
+    for (const child of container.Children) {
+      if ('children' in child && 'color' in child) {
+        collectHiddenDescendants(child as Container, ids)
+      }
+    }
+  }, [])
+
+  hiddenIdsRef.current = new Set(hiddenIds)
+  for (const container of containersRef.current) {
+    if (!hiddenIds.has(container.id)) continue
+    collectHiddenDescendants(container, hiddenIdsRef.current)
+  }
+  for (const edge of workspaceRef.current?.edges ?? []) {
+    const typedEdge = edge as Edge
+    if (
+      hiddenIdsRef.current.has(typedEdge.startConnector.id) ||
+      hiddenIdsRef.current.has(typedEdge.endConnector.id)
+    ) {
+      hiddenIdsRef.current.add(typedEdge.id)
+    }
+  }
 
   // ワークスペース準備完了時にFactoryProviderに通知
   const notified = useRef(false)
@@ -83,53 +179,31 @@ export function FactoryCanvas({ onWorkspaceReady }: FactoryCanvasProps) {
     overlay.style.opacity = showDebugSvg ? '1' : '0'
   }, [showDebugSvg])
 
+  useEffect(() => {
+    const svg = svgRef.current
+    const canvas = canvasRef.current
+    if (!svg || !canvas) return
+
+    const hidden = hiddenIdsRef.current
+    svg.querySelectorAll<SVGElement>('[data-element-id]').forEach((element) => {
+      const id = element.getAttribute('data-element-id')
+      element.style.display = id && hidden.has(id) ? 'none' : ''
+      element.style.pointerEvents = id && hidden.has(id) ? 'none' : ''
+    })
+    canvas.querySelectorAll<HTMLElement>('[id^="node-"]').forEach((element) => {
+      const id = element.id.replace('node-', '')
+      element.style.display = hidden.has(id) ? 'none' : ''
+      element.style.pointerEvents = hidden.has(id) ? 'none' : ''
+    })
+  }, [revision, hiddenIds])
+
   // ツールモード連動: move モードではドラッグとEdgeBuilderを無効化
   useEffect(() => {
-    const isMoveMode = toolMode === 'move'
-    interactionRef.current?.setDisableDrag(isMoveMode)
-    interactionRef.current?.setDisableEdgeBuilder(isMoveMode)
+    interactionRef.current?.setDisableDrag(toolMode !== 'select')
+    interactionRef.current?.setDisableEdgeBuilder(toolMode !== 'connect')
   }, [toolMode, interactionRef])
 
   // EdgeBuilder
-  const edgeBuilderInitialized = useRef(false)
-  useEffect(() => {
-    if (!ready || edgeBuilderInitialized.current) return
-    const ws = workspaceRef.current
-    const svg = svgRef.current
-    if (!ws || !svg) return
-    edgeBuilderInitialized.current = true
-
-    const previewPath = document.createElementNS('http://www.w3.org/2000/svg', 'path')
-    previewPath.setAttribute('fill', 'none')
-    previewPath.setAttribute('stroke', 'rgba(59,130,246,0.6)')
-    previewPath.setAttribute('stroke-width', '2')
-    previewPath.setAttribute('stroke-dasharray', '6 3')
-    previewPath.setAttribute('display', 'none')
-    const vg = svg.querySelector('[data-role="viewport"]') as SVGGElement
-    if (vg) vg.appendChild(previewPath)
-
-    new EdgeBuilder({
-      workspace: ws,
-      edgeType: 'bezier',
-      onPreview: (path) => {
-        previewPath.setAttribute('d', path)
-        previewPath.setAttribute('display', 'block')
-      },
-      onComplete: (edge) => {
-        previewPath.setAttribute('display', 'none')
-        ws.removeEdge(edge)
-        ws.history.execute({
-          execute() { ws.addEdge(edge) },
-          undo() { ws.removeEdge(edge) },
-        })
-        syncState()
-      },
-      onCancel: () => {
-        previewPath.setAttribute('display', 'none')
-      },
-    })
-  }, [ready, workspaceRef, syncState])
-
   // EventBusでノード一覧を同期
   useEffect(() => {
     if (!ready) return
@@ -138,13 +212,15 @@ export function FactoryCanvas({ onWorkspaceReady }: FactoryCanvasProps) {
 
     const refreshNodes = () => {
       setNodes(
-        containersRef.current.map((c) => ({
+        containersRef.current
+          .filter((c) => !isHidden(c.id))
+          .map((c) => ({
           id: c.id,
           name: c.name,
           w: c.width,
           h: c.height,
           color: c.color,
-        }))
+          }))
       )
     }
 
@@ -166,7 +242,7 @@ export function FactoryCanvas({ onWorkspaceReady }: FactoryCanvasProps) {
     return () => {
       for (const u of unsubs) u()
     }
-  }, [ready, workspaceRef, containersRef])
+  }, [ready, workspaceRef, containersRef, isHidden])
 
   // 配置モード時のキャンバスクリック
   useEffect(() => {
@@ -342,9 +418,12 @@ export function FactoryCanvas({ onWorkspaceReady }: FactoryCanvasProps) {
         {(selectedElement?.type === 'container' || selectedElement?.type === 'connector') &&
          toolMode === 'move' &&
          placementMode.type === 'none' &&
-         ctxWorkspace && (
+         ctxWorkspace &&
+         !isHidden(selectedElement.element.id) &&
+         !selectionItems.some((item) => isLocked(item.id)) && (
           <MoveGizmo
             element={selectedElement.element}
+            selectionItems={selectionItems}
             workspace={ctxWorkspace}
             onMoveEnd={syncState}
           />

@@ -2,9 +2,8 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { DebugPanel } from '../../components/DebugPanel'
 import { SampleLayout } from '../../components/SampleLayout'
 import { VplCanvas } from '../../components/VplCanvas'
-import { useWorkspace } from '../../hooks/useWorkspace'
-import { Connector, Container, Edge, Position } from '../../lib/headless-vpl'
-import type { EdgeType } from '../../lib/headless-vpl'
+import { useRecipeWorkspace } from '../../hooks/workspace/useRecipeWorkspace'
+import { Connector, Container, Edge, Position, type EdgeType } from '../../lib/headless-vpl/primitives'
 
 const edgeTypes: { type: EdgeType; label: string }[] = [
   { type: 'straight', label: 'Straight' },
@@ -20,7 +19,7 @@ export default function EdgeTypes() {
   const [showGrid, setShowGrid] = useState(true)
   const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null)
 
-  const { workspaceRef, containersRef, ready } = useWorkspace(svgRef, overlayRef, canvasRef, {
+  const { workspaceRef, containersRef, ready } = useRecipeWorkspace(svgRef, overlayRef, canvasRef, {
     enableShortcuts: false,
     interactionOverrides: {
       onEdgeSelect: (id) => setSelectedEdgeId(id),

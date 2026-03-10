@@ -6,6 +6,7 @@
   "files": {
     "ignore": [
       "dist",
+      "coverage",
       "node_modules",
       ".changeset",
       "docs-site/.vitepress/cache",

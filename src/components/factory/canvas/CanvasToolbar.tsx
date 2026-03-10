@@ -12,6 +12,7 @@ export function CanvasToolbar() {
     toolMode,
     setToolMode,
     syncState,
+    actions,
   } = useFactory()
 
   const handleUndo = useCallback(() => {
@@ -55,11 +56,11 @@ export function CanvasToolbar() {
     <div className='factory-toolbar'>
       <div className='factory-toolbar-group'>
         <button
-          onClick={() => setToolMode('preview')}
-          className={`factory-toolbar-btn${toolMode === 'preview' ? ' factory-toolbar-btn-active' : ''}`}
-          title='Preview mode'
+          onClick={() => setToolMode('select')}
+          className={`factory-toolbar-btn${toolMode === 'select' ? ' factory-toolbar-btn-active' : ''}`}
+          title='Select mode'
         >
-          Preview
+          Select
         </button>
         <button
           onClick={() => setToolMode('move')}
@@ -67,6 +68,13 @@ export function CanvasToolbar() {
           title='Move gizmo mode'
         >
           Move
+        </button>
+        <button
+          onClick={() => setToolMode('connect')}
+          className={`factory-toolbar-btn${toolMode === 'connect' ? ' factory-toolbar-btn-active' : ''}`}
+          title='Connect mode'
+        >
+          Connect
         </button>
       </div>
 
@@ -90,6 +98,9 @@ export function CanvasToolbar() {
       </div>
 
       <div className='factory-toolbar-group'>
+        <button onClick={actions.frameSelection} className='factory-toolbar-btn'>
+          Frame
+        </button>
         <button onClick={() => handleZoom(-0.1)} className='factory-toolbar-btn'>
           -
         </button>

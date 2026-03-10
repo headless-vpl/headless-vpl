@@ -9,10 +9,8 @@ Headless VPL を使った各種 VPL のコード例。
 縦積みブロックをスナップ接続で繋げる。
 
 ```typescript
-import {
-  Workspace, Container, Connector, Position,
-  SnapConnection, childOnly, SvgRenderer,
-} from 'headless-vpl'
+import { Workspace, Container, Connector, Position, SvgRenderer } from 'headless-vpl/primitives'
+import { SnapConnection, childOnly } from 'headless-vpl/helpers'
 
 const workspace = new Workspace()
 const svg = document.querySelector('#workspace') as SVGSVGElement
@@ -62,8 +60,13 @@ const connection = new SnapConnection({
 
 ```typescript
 import {
-  Workspace, Container, Connector, Edge, Position, SvgRenderer,
-} from 'headless-vpl'
+  Workspace,
+  Container,
+  Connector,
+  Edge,
+  Position,
+  SvgRenderer,
+} from 'headless-vpl/primitives'
 
 const workspace = new Workspace()
 new SvgRenderer(document.querySelector('#workspace') as SVGSVGElement, workspace)
@@ -120,9 +123,14 @@ new Edge({
 
 ```typescript
 import {
-  Workspace, Container, Connector, Edge, Position,
-  SnapConnection, childOnly, SvgRenderer,
-} from 'headless-vpl'
+  Workspace,
+  Container,
+  Connector,
+  Edge,
+  Position,
+  SvgRenderer,
+} from 'headless-vpl/primitives'
+import { SnapConnection, childOnly } from 'headless-vpl/helpers'
 
 const workspace = new Workspace()
 new SvgRenderer(document.querySelector('#workspace') as SVGSVGElement, workspace)
@@ -193,9 +201,13 @@ AutoLayout と NestingZone で Scratch のようなスロット（値ブロッ�
 
 ```typescript
 import {
-  Workspace, Container, AutoLayout, Position,
-  NestingZone, observeContentSize, SvgRenderer,
-} from 'headless-vpl'
+  Workspace,
+  Container,
+  AutoLayout,
+  Position,
+  SvgRenderer,
+} from 'headless-vpl/primitives'
+import { NestingZone, observeContentSize } from 'headless-vpl/helpers'
 
 const workspace = new Workspace()
 new SvgRenderer(document.querySelector('#workspace') as SVGSVGElement, workspace)
@@ -255,13 +267,23 @@ const cleanup = observeContentSize(
 
 ```typescript
 import {
-  Workspace, Container, Connector, Position, SvgRenderer,
-  InteractionManager, EdgeBuilder, NestingZone,
-  SnapConnection, childOnly,
-  DomSyncHelper, bindWheelZoom, bindDefaultShortcuts,
-} from 'headless-vpl'
-import { getMouseState } from 'headless-vpl/util/mouse'
-import { animate } from 'headless-vpl/util/animate'
+  Workspace,
+  Container,
+  Connector,
+  Position,
+  SvgRenderer,
+} from 'headless-vpl/primitives'
+import {
+  EdgeBuilder,
+  NestingZone,
+  SnapConnection,
+  childOnly,
+  DomSyncHelper,
+  bindWheelZoom,
+} from 'headless-vpl/helpers'
+import { InteractionManager, bindDefaultShortcuts } from 'headless-vpl/recipes'
+import { getMouseState } from 'headless-vpl/utils/mouse'
+import { animate } from 'headless-vpl/utils/animate'
 
 // 1. ワークスペース + レンダラー
 const workspace = new Workspace()

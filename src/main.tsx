@@ -1,12 +1,13 @@
 import { Suspense, lazy } from 'react'
 import { createRoot } from 'react-dom/client'
-import { RouterProvider, createHashRouter } from 'react-router-dom'
+import { Navigate, RouterProvider, createHashRouter } from 'react-router-dom'
 import './index.css'
 import App from './App'
 import { ThemeProvider } from './contexts/ThemeContext'
 
 // ページの遅延読み込み
 const Home = lazy(() => import('./pages/Home'))
+const Examples = lazy(() => import('./pages/Examples'))
 const FlowEditor = lazy(() => import('./pages/samples/FlowEditor'))
 const BlockEditor = lazy(() => import('./pages/samples/BlockEditor'))
 const HybridEditor = lazy(() => import('./pages/samples/HybridEditor'))
@@ -44,6 +45,14 @@ const router = createHashRouter([
         element: (
           <Suspense fallback={<Loading />}>
             <Home />
+          </Suspense>
+        ),
+      },
+      {
+        path: 'examples',
+        element: (
+          <Suspense fallback={<Loading />}>
+            <Examples />
           </Suspense>
         ),
       },
@@ -190,6 +199,10 @@ const router = createHashRouter([
             <Factory />
           </Suspense>
         ),
+      },
+      {
+        path: '*',
+        element: <Navigate to="/" replace />,
       },
     ],
   },

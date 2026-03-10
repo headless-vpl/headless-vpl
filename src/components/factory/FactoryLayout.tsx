@@ -55,9 +55,12 @@ export function FactoryLayout({ onWorkspaceReady }: FactoryLayoutProps) {
   // キーボードショートカット
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement
+      const isField = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT'
+
       // Delete/Backspace - 選択削除
       if (e.key === 'Delete' || e.key === 'Backspace') {
-        if ((e.target as HTMLElement).tagName === 'INPUT' || (e.target as HTMLElement).tagName === 'TEXTAREA') return
+        if (isField) return
         e.preventDefault()
         actions.deleteSelected()
       }
@@ -76,7 +79,7 @@ export function FactoryLayout({ onWorkspaceReady }: FactoryLayoutProps) {
 
       // Ctrl+Z - Undo
       if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
-        if ((e.target as HTMLElement).tagName === 'INPUT' || (e.target as HTMLElement).tagName === 'TEXTAREA') return
+        if (isField) return
         workspace?.history.undo()
         syncState()
       }
@@ -84,9 +87,41 @@ export function FactoryLayout({ onWorkspaceReady }: FactoryLayoutProps) {
       // Ctrl+Shift+Z or Ctrl+Y - Redo
       if (((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'z') ||
           ((e.ctrlKey || e.metaKey) && e.key === 'y')) {
-        if ((e.target as HTMLElement).tagName === 'INPUT' || (e.target as HTMLElement).tagName === 'TEXTAREA') return
+        if (isField) return
         workspace?.history.redo()
         syncState()
+      }
+
+      if ((e.ctrlKey || e.metaKey) && e.key === 'a') {
+        if (isField || !workspace) return
+        e.preventDefault()
+        workspace.selection.deselectAll()
+        for (const container of workspace.elements.filter((el) => el.type === 'container')) {
+          workspace.selection.select(container as any)
+        }
+        syncState()
+      }
+
+      if ((e.ctrlKey || e.metaKey) && e.key === 'e') {
+        e.preventDefault()
+        actions.frameSelection()
+      }
+
+      if ((e.ctrlKey || e.metaKey) && e.key === 'l') {
+        e.preventDefault()
+        const result = actions.loadFromStorage()
+        if (!result.ok && result.error) {
+          window.alert(result.error)
+        }
+      }
+
+      if (!isField && ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+        e.preventDefault()
+        const step = e.shiftKey ? 10 : 1
+        if (e.key === 'ArrowUp') actions.moveSelectionBy(0, -step)
+        if (e.key === 'ArrowDown') actions.moveSelectionBy(0, step)
+        if (e.key === 'ArrowLeft') actions.moveSelectionBy(-step, 0)
+        if (e.key === 'ArrowRight') actions.moveSelectionBy(step, 0)
       }
     }
 
@@ -95,6 +130,12 @@ export function FactoryLayout({ onWorkspaceReady }: FactoryLayoutProps) {
   }, [workspace, actions, syncState])
 
   const contextMenuItems = [
+    {
+      label: 'Frame Selection',
+      shortcut: 'Ctrl+E',
+      action: () => actions.frameSelection(),
+      disabled: selectedCount === 0,
+    },
     {
       label: 'Duplicate',
       shortcut: 'Ctrl+D',
@@ -107,11 +148,44 @@ export function FactoryLayout({ onWorkspaceReady }: FactoryLayoutProps) {
       action: () => actions.deleteSelected(),
       disabled: selectedCount === 0,
     },
+    {
+      label: 'Detach',
+      shortcut: '',
+      action: () => actions.detachSelected(),
+      disabled: selectedCount === 0,
+    },
     { separator: true as const },
     {
       label: 'Save to LocalStorage',
       shortcut: 'Ctrl+S',
       action: () => actions.saveToStorage(),
+    },
+    {
+      label: 'Load from LocalStorage',
+      shortcut: 'Ctrl+L',
+      action: () => {
+        const result = actions.loadFromStorage()
+        if (!result.ok && result.error) window.alert(result.error)
+      },
+    },
+    {
+      label: 'Export Project JSON',
+      shortcut: '',
+      action: async () => {
+        const raw = actions.exportProject()
+        if (!raw) return
+        await navigator.clipboard.writeText(raw)
+      },
+    },
+    {
+      label: 'Import Project JSON',
+      shortcut: '',
+      action: () => {
+        const raw = window.prompt('Paste Factory project JSON')
+        if (!raw) return
+        const result = actions.importProject(raw)
+        if (!result.ok && result.error) window.alert(result.error)
+      },
     },
   ]
 

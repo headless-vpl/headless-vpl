@@ -1,10 +1,21 @@
 import { useFactory } from '../../contexts/FactoryContext'
 
 export function StatusBar() {
-  const { elementCount, edgeCount, selectedCount, zoom, placementMode } = useFactory()
+  const {
+    elementCount,
+    edgeCount,
+    selectedCount,
+    zoom,
+    placementMode,
+    toolMode,
+    autosaveState,
+    selectionPath,
+  } = useFactory()
 
   return (
     <div className='factory-statusbar'>
+      <span>Tool: {toolMode}</span>
+      <span className='factory-statusbar-sep'>|</span>
       <span>Elements: {elementCount}</span>
       <span className='factory-statusbar-sep'>|</span>
       <span>Edges: {edgeCount}</span>
@@ -12,6 +23,14 @@ export function StatusBar() {
       <span>Selected: {selectedCount}</span>
       <span className='factory-statusbar-sep'>|</span>
       <span>Zoom: {zoom}%</span>
+      <span className='factory-statusbar-sep'>|</span>
+      <span>Autosave: {autosaveState}</span>
+      {selectionPath.length > 0 && (
+        <>
+          <span className='factory-statusbar-sep'>|</span>
+          <span className='factory-statusbar-placement'>{selectionPath.join(' / ')}</span>
+        </>
+      )}
       {placementMode.type === 'edge' && (
         <>
           <span className='factory-statusbar-sep'>|</span>

@@ -30,10 +30,7 @@ export type CreateConnectorInsertZoneConfig = {
 }
 
 export function isConnectorColliding(source: Connector, target: Connector): boolean {
-  const dx = source.position.x - target.position.x
-  const dy = source.position.y - target.position.y
-  const radius = source.hitRadius + target.hitRadius
-  return dx * dx + dy * dy <= radius * radius
+  return source.collidesWith(target)
 }
 
 export function findConnectorInsertHit({

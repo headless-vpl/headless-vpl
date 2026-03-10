@@ -2,8 +2,9 @@ import { useRef, useState } from 'react'
 import { DebugPanel } from '../../components/DebugPanel'
 import { SampleLayout } from '../../components/SampleLayout'
 import { VplCanvas } from '../../components/VplCanvas'
-import { useWorkspace } from '../../hooks/useWorkspace'
-import { AutoLayout, Container, NestingZone, Position } from '../../lib/headless-vpl'
+import { useRecipeWorkspace } from '../../hooks/workspace/useRecipeWorkspace'
+import { NestingZone } from '../../lib/headless-vpl/helpers'
+import { AutoLayout, Container, Position } from '../../lib/headless-vpl/primitives'
 
 export default function NestingDemo() {
   const svgRef = useRef<SVGSVGElement | null>(null)
@@ -13,7 +14,7 @@ export default function NestingDemo() {
 
   const nestingZonesRef = useRef<NestingZone[]>([])
 
-  const { workspaceRef, containersRef, interactionRef, ready } = useWorkspace(svgRef, overlayRef, canvasRef, {
+  const { workspaceRef, containersRef, interactionRef, ready } = useRecipeWorkspace(svgRef, overlayRef, canvasRef, {
     enableShortcuts: false,
     interactionOverrides: { nestingZones: nestingZonesRef.current },
   })

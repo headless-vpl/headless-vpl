@@ -38,8 +38,11 @@
 
 | API | 説明 |
 |-----|------|
-| `InteractionManager` | DnD・パン・マーキー・リサイズ・Edge 作成を統合管理 |
+| `DragAndDrop` | 低レベルな DnD 更新 |
+| `NestingZone` | AutoLayout へのネスト管理 |
 | `SnapConnection` | スナップ接続管理 |
+
+`InteractionManager` はこれらをまとめる recipe 層の orchestrator として扱います。
 
 ## 4. 入力の型
 

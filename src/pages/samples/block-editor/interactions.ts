@@ -1,13 +1,12 @@
-import {
-  createSlotZone,
-  createSnapConnections,
-} from '../../../lib/headless-vpl';
+import { createSlotZone } from '../../../lib/headless-vpl/util/nesting';
+import { createSnapConnections } from '../../../lib/headless-vpl/util/snap';
 import {
   createConnectorInsertZone,
+  isConnectorColliding,
 } from '../../../lib/headless-vpl/blocks';
+import { NestingZone } from '../../../lib/headless-vpl';
 import type {
   Container,
-  NestingZone,
   Position,
   SnapConnection,
   Workspace,
@@ -29,6 +28,35 @@ import {
   hasPriorityCBlockBodyHit,
   syncBodyLayoutChain,
 } from './layout';
+
+function createBooleanSlotZone(
+  ws: Workspace,
+  block: CreatedBlock,
+  registry: BlockRegistry,
+  slot: CreatedBlock['slotLayouts'][number],
+) {
+  return new NestingZone({
+    target: block.container,
+    layout: slot.layout,
+    workspace: ws,
+    priority: 150,
+    padding: 0,
+    validator: (dragged) => {
+      if (slot.layout.Children.length > 0) return false;
+      const state = registry.blockMap.get(dragged.id);
+      return Boolean(state && state.def.shape === 'boolean');
+    },
+    connectorHit: (dragged) => {
+      const draggedBlock = registry.createdMap.get(dragged.id);
+      if (!draggedBlock?.valueConnector || !slot.connector) {
+        return null;
+      }
+      return isConnectorColliding(draggedBlock.valueConnector, slot.connector)
+        ? 0
+        : null;
+    },
+  });
+}
 
 export function registerSnapConnections(
   ws: Workspace,
@@ -109,20 +137,29 @@ export function registerSlotZones(
   slotZoneMap: Map<NestingZone, SlotZoneMeta>,
 ) {
   for (const block of created) {
-    for (const { info, layout } of block.slotLayouts) {
-      const zone = createSlotZone({
-        target: block.container,
-        layout,
-        workspace: ws,
-        priority: 150,
-        occupancy: 'single',
-        accepts: (dragged) => {
-          const state = registry.blockMap.get(dragged.id);
-          return Boolean(state && isValueBlockShape(state.def.shape));
-        },
-        centerTolerance: { x: 30, y: 20 },
-        padding: 0,
-      });
+    for (const slot of block.slotLayouts) {
+      const { info, layout } = slot;
+      const isBooleanSlot =
+        info.acceptedShapes.length === 1 && info.acceptedShapes[0] === 'boolean';
+      const zone = isBooleanSlot
+        ? createBooleanSlotZone(ws, block, registry, slot)
+        : createSlotZone({
+            target: block.container,
+            layout,
+            workspace: ws,
+            priority: 150,
+            occupancy: 'single',
+            accepts: (dragged) => {
+              const state = registry.blockMap.get(dragged.id);
+              return Boolean(
+                state &&
+                  isValueBlockShape(state.def.shape) &&
+                  info.acceptedShapes.includes(state.def.shape),
+              );
+            },
+            centerTolerance: { x: 30, y: 20 },
+            padding: 0,
+          });
 
       nestingZones.push(zone);
       slotZoneMap.set(zone, {

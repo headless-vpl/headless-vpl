@@ -1,6 +1,7 @@
 import { useCallback } from 'react'
 import type Container from '../../../lib/headless-vpl/core/Container'
 import { useFactory } from '../../../contexts/FactoryContext'
+import { MoveCommand, UpdateElementCommand } from '../../../lib/headless-vpl'
 import { PropertyField } from './PropertyField'
 
 type Props = {
@@ -11,12 +12,25 @@ export function ContainerProperties({ container }: Props) {
   const { workspace, syncState } = useFactory()
 
   const update = useCallback(
-    (fn: () => void) => {
-      fn()
-      container.update()
-      syncState()
+    (apply: () => void, revert: () => void) => {
+      if (!workspace) {
+        apply()
+        container.update()
+        syncState()
+        return
+      }
+      workspace.history.execute(
+        new UpdateElementCommand({
+          execute: apply,
+          undo: revert,
+          onAfter: () => {
+            container.update()
+            syncState()
+          },
+        })
+      )
     },
-    [container, syncState]
+    [container, syncState, workspace]
   )
 
   return (
@@ -26,26 +40,56 @@ export function ContainerProperties({ container }: Props) {
         label='Name'
         type='text'
         value={container.name}
-        onChange={(v) => update(() => { container.name = v })}
+        onChange={(v) => {
+          const previous = container.name
+          update(() => { container.name = v }, () => { container.name = previous })
+        }}
       />
       <PropertyField
         label='Color'
         type='color'
         value={container.color}
-        onChange={(v) => update(() => { container.setColor(v) })}
+        onChange={(v) => {
+          const previous = container.color
+          update(() => { container.color = v }, () => { container.color = previous })
+        }}
       />
       <div className='factory-props-row'>
         <PropertyField
           label='X'
           type='number'
           value={Math.round(container.position.x)}
-          onChange={(v) => { container.move(v, container.position.y); syncState() }}
+          onChange={(v) => {
+            if (!workspace) return
+            workspace.history.execute(
+              new MoveCommand(
+                container,
+                container.position.x,
+                container.position.y,
+                v,
+                container.position.y
+              )
+            )
+            syncState()
+          }}
         />
         <PropertyField
           label='Y'
           type='number'
           value={Math.round(container.position.y)}
-          onChange={(v) => { container.move(container.position.x, v); syncState() }}
+          onChange={(v) => {
+            if (!workspace) return
+            workspace.history.execute(
+              new MoveCommand(
+                container,
+                container.position.x,
+                container.position.y,
+                container.position.x,
+                v
+              )
+            )
+            syncState()
+          }}
         />
       </div>
       <div className='factory-props-row'>
@@ -54,14 +98,20 @@ export function ContainerProperties({ container }: Props) {
           type='number'
           value={container.width}
           min={10}
-          onChange={(v) => update(() => { container.width = v })}
+          onChange={(v) => {
+            const previous = container.width
+            update(() => { container.width = v }, () => { container.width = previous })
+          }}
         />
         <PropertyField
           label='Height'
           type='number'
           value={container.height}
           min={10}
-          onChange={(v) => update(() => { container.height = v })}
+          onChange={(v) => {
+            const previous = container.height
+            update(() => { container.height = v }, () => { container.height = previous })
+          }}
         />
       </div>
       <div className='factory-props-row'>
@@ -74,7 +124,13 @@ export function ContainerProperties({ container }: Props) {
             { label: 'Hug', value: 'hug' },
             { label: 'Fill', value: 'fill' },
           ]}
-          onChange={(v) => update(() => { container.widthMode = v as 'fixed' | 'hug' | 'fill' })}
+          onChange={(v) => {
+            const previous = container.widthMode
+            update(
+              () => { container.widthMode = v as 'fixed' | 'hug' | 'fill' },
+              () => { container.widthMode = previous }
+            )
+          }}
         />
         <PropertyField
           label='H Mode'
@@ -85,7 +141,13 @@ export function ContainerProperties({ container }: Props) {
             { label: 'Hug', value: 'hug' },
             { label: 'Fill', value: 'fill' },
           ]}
-          onChange={(v) => update(() => { container.heightMode = v as 'fixed' | 'hug' | 'fill' })}
+          onChange={(v) => {
+            const previous = container.heightMode
+            update(
+              () => { container.heightMode = v as 'fixed' | 'hug' | 'fill' },
+              () => { container.heightMode = previous }
+            )
+          }}
         />
       </div>
 
@@ -96,14 +158,20 @@ export function ContainerProperties({ container }: Props) {
           type='number'
           value={container.padding.top}
           min={0}
-          onChange={(v) => update(() => { container.padding.top = v })}
+          onChange={(v) => {
+            const previous = container.padding.top
+            update(() => { container.padding.top = v }, () => { container.padding.top = previous })
+          }}
         />
         <PropertyField
           label='Right'
           type='number'
           value={container.padding.right}
           min={0}
-          onChange={(v) => update(() => { container.padding.right = v })}
+          onChange={(v) => {
+            const previous = container.padding.right
+            update(() => { container.padding.right = v }, () => { container.padding.right = previous })
+          }}
         />
       </div>
       <div className='factory-props-row'>
@@ -112,14 +180,20 @@ export function ContainerProperties({ container }: Props) {
           type='number'
           value={container.padding.bottom}
           min={0}
-          onChange={(v) => update(() => { container.padding.bottom = v })}
+          onChange={(v) => {
+            const previous = container.padding.bottom
+            update(() => { container.padding.bottom = v }, () => { container.padding.bottom = previous })
+          }}
         />
         <PropertyField
           label='Left'
           type='number'
           value={container.padding.left}
           min={0}
-          onChange={(v) => update(() => { container.padding.left = v })}
+          onChange={(v) => {
+            const previous = container.padding.left
+            update(() => { container.padding.left = v }, () => { container.padding.left = previous })
+          }}
         />
       </div>
       <PropertyField
@@ -127,13 +201,19 @@ export function ContainerProperties({ container }: Props) {
         type='number'
         value={container.contentGap}
         min={0}
-        onChange={(v) => update(() => { container.contentGap = v })}
+        onChange={(v) => {
+          const previous = container.contentGap
+          update(() => { container.contentGap = v }, () => { container.contentGap = previous })
+        }}
       />
       <PropertyField
         label='Resizable'
         type='checkbox'
         value={container.resizable}
-        onChange={(v) => update(() => { container.resizable = v })}
+        onChange={(v) => {
+          const previous = container.resizable
+          update(() => { container.resizable = v }, () => { container.resizable = previous })
+        }}
       />
     </div>
   )

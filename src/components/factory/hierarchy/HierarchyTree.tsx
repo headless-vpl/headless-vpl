@@ -5,6 +5,8 @@ import {
   ConnectCommand,
   DetachCommand,
   NestCommand,
+  ReorderAutoLayoutChildrenCommand,
+  ReorderChildrenCommand,
   ReparentChildCommand,
 } from '../../../lib/headless-vpl'
 import type { Connector } from '../../../lib/headless-vpl'
@@ -169,6 +171,14 @@ function resolveTargetKey(sourceKey: string, targetContainer: Container): string
   return `${sourceKey}_${i}`
 }
 
+function reorderList<T>(items: T[], dragged: T, target: T, position: 'before' | 'after'): T[] {
+  const next = items.filter((item) => item !== dragged)
+  const targetIndex = next.indexOf(target)
+  const insertIndex = targetIndex + (position === 'after' ? 1 : 0)
+  next.splice(Math.max(0, insertIndex), 0, dragged)
+  return next
+}
+
 /** AutoLayoutの子孫コンテナにtargetが含まれていないかチェック（循環参照防止） */
 function isContainerInAutoLayoutDescendants(target: Container, layout: AutoLayout): boolean {
   for (const child of layout.Children as Container[]) {
@@ -186,7 +196,18 @@ function isContainerInAutoLayoutDescendants(target: Container, layout: AutoLayou
 }
 
 export function HierarchyTree() {
-  const { workspace, selectedElement, setSelectedElement, focusOnElement } = useFactory()
+  const {
+    workspace,
+    selectedElement,
+    setSelectedElement,
+    focusOnElement,
+    expandedNodeIds,
+    setNodeExpanded,
+    isHidden,
+    isLocked,
+    toggleHidden,
+    toggleLocked,
+  } = useFactory()
   const [tree, setTree] = useState<TreeItem[]>([])
   const [edgeItems, setEdgeItems] = useState<TreeItem[]>([])
 
@@ -253,16 +274,8 @@ export function HierarchyTree() {
     ? (selectedElement.element as { id?: string }).id
     : null
 
-  /**
-   * ツリービュー内DnDの実行位置を正規化する。
-   * container -> container は並べ替えよりネストを優先し、常に "on" として扱う。
-   */
   const resolveDropPosition = useCallback(
-    (dragItem: TreeItem, targetItem: TreeItem | null, rawPos: DropPosition): DropPosition => {
-      if (!targetItem) return 'on'
-      if (dragItem.type === 'container' && targetItem.type === 'container') return 'on'
-      return rawPos
-    },
+    (_dragItem: TreeItem, _targetItem: TreeItem | null, rawPos: DropPosition): DropPosition => rawPos,
     []
   )
 
@@ -271,6 +284,8 @@ export function HierarchyTree() {
     (dragItem: TreeItem, targetItem: TreeItem | null, pos: DropPosition): boolean => {
       // 自分自身へのドロップは不可
       if (targetItem && dragItem.id === targetItem.id) return false
+      if (isLocked(dragItem.id)) return false
+      if (targetItem && isLocked(targetItem.id)) return false
 
       // --- connector / autolayout の親コンテナ変更 ---
       if (dragItem.type === 'connector' || dragItem.type === 'autolayout') {
@@ -325,12 +340,13 @@ export function HierarchyTree() {
 
       // before/after はコンテナ間の並べ替え（snap関係設定として扱う）
       if (targetItem.type === 'container' && (pos === 'before' || pos === 'after')) {
-        return true
+        const targetContainer = targetItem.element as Container
+        return Boolean(targetContainer.Parent || targetContainer.parentAutoLayout)
       }
 
       return false
     },
-    [workspace]
+    [workspace, isLocked]
   )
 
   const canDropToRoot = useMemo(() => {
@@ -361,7 +377,15 @@ export function HierarchyTree() {
 
   /** DnD: ドラッグ開始 */
   const handleDragStart = useCallback((e: React.DragEvent, item: TreeItem) => {
-    if (item.type !== 'container' && item.type !== 'connector' && item.type !== 'autolayout') {
+    if (
+      item.type !== 'container' &&
+      item.type !== 'connector' &&
+      item.type !== 'autolayout'
+    ) {
+      e.preventDefault()
+      return
+    }
+    if (isLocked(item.id)) {
       e.preventDefault()
       return
     }
@@ -369,7 +393,7 @@ export function HierarchyTree() {
     e.dataTransfer.setData('text/plain', item.id)
     setDragItemId(item.id)
     dragItemRef.current = item
-  }, [])
+  }, [isLocked])
 
   /** DnD: ドラッグオーバー */
   const handleDragOver = useCallback(
@@ -465,16 +489,49 @@ export function HierarchyTree() {
         targetItem.type === 'container' &&
         (resolvedDropPosition === 'before' || resolvedDropPosition === 'after')
       ) {
-        // コンテナの前後にドロップ: 同じ親にsnap接続
         const targetEl = targetItem.element as MovableObject
-        if (targetEl.Parent) {
-          commands.push(
-            new ConnectCommand(
-              workspace,
-              targetEl.Parent as IWorkspaceElement & { Children: Set<MovableObject> },
-              draggedEl as IWorkspaceElement & { Parent: unknown }
+        const targetContainer = targetItem.element as Container
+
+        if (targetContainer.parentAutoLayout) {
+          const layout = targetContainer.parentAutoLayout
+          if (draggedEl.parentAutoLayout === layout) {
+            const nextOrder = reorderList(
+              [...layout.Children],
+              draggedEl,
+              targetContainer,
+              resolvedDropPosition
             )
+            commands.push(new ReorderAutoLayoutChildrenCommand(workspace, layout, nextOrder))
+          } else {
+            const targetIndex =
+              layout.Children.indexOf(targetContainer) +
+              (resolvedDropPosition === 'after' ? 1 : 0)
+            commands.push(new NestCommand(draggedEl, layout, workspace, targetIndex))
+          }
+        } else if (targetEl.Parent) {
+          const parent = targetEl.Parent
+          const currentOrder = [...parent.Children].filter(
+            (child): child is MovableObject & Container => 'color' in child
           )
+          if (draggedEl.Parent === parent) {
+            const nextOrder = reorderList(currentOrder, draggedEl, targetContainer, resolvedDropPosition)
+            commands.push(new ReorderChildrenCommand(workspace, parent, nextOrder))
+          } else {
+            commands.push(
+              new ConnectCommand(
+                workspace,
+                parent as IWorkspaceElement & { Children: Set<MovableObject> },
+                draggedEl as IWorkspaceElement & { Parent: unknown }
+              )
+            )
+            const nextOrder = reorderList(
+              currentOrder.filter((child) => child !== draggedEl),
+              draggedEl,
+              targetContainer,
+              resolvedDropPosition
+            )
+            commands.push(new ReorderChildrenCommand(workspace, parent, nextOrder))
+          }
         }
       }
 
@@ -554,6 +611,12 @@ export function HierarchyTree() {
             item={item}
             depth={1}
             selectedId={selectedId}
+            isExpanded={(id) => expandedNodeIds.has(id)}
+            isHidden={isHidden}
+            isLocked={isLocked}
+            onToggleExpand={setNodeExpanded}
+            onToggleHidden={toggleHidden}
+            onToggleLocked={toggleLocked}
             onSelect={(item) => {
               if (item.type === 'container') {
                 setSelectedElement({ type: 'container', element: item.element as Container })
@@ -561,8 +624,11 @@ export function HierarchyTree() {
                 workspace?.selection.select(item.element as Container)
               } else if (item.type === 'connector') {
                 setSelectedElement({ type: 'connector', element: item.element as Connector })
+                workspace?.selection.deselectAll()
+                workspace?.selection.select(item.element as Connector)
               } else if (item.type === 'autolayout') {
                 setSelectedElement({ type: 'autolayout', element: item.element as AutoLayout })
+                workspace?.selection.deselectAll()
               }
               const el = item.element as { position?: { x: number; y: number } }
               if (el.position) {
@@ -592,9 +658,16 @@ export function HierarchyTree() {
                 item={item}
                 depth={2}
                 selectedId={selectedId}
+                isExpanded={(id) => expandedNodeIds.has(id)}
+                isHidden={isHidden}
+                isLocked={isLocked}
+                onToggleExpand={setNodeExpanded}
+                onToggleHidden={toggleHidden}
+                onToggleLocked={toggleLocked}
                 onSelect={(item) => {
                   const edge = item.element as Edge
                   setSelectedElement({ type: 'edge', element: edge })
+                  workspace?.selection.deselectAll()
                   if (edge.startConnector?.position) {
                     focusOnElement(edge.startConnector)
                   }

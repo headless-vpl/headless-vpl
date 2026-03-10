@@ -167,6 +167,7 @@ export class SvgRenderer {
     }
 
     if (svgEl) {
+      svgEl.setAttribute('data-element-id', id)
       this.elementMap.set(id, svgEl)
       this.viewportGroup.appendChild(svgEl)
     }

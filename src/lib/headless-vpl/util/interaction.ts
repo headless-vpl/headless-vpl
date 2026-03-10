@@ -5,11 +5,19 @@ import type Workspace from '../core/Workspace'
 import { BatchCommand, MoveCommand, NestCommand } from '../core/commands'
 import { computeAutoPan } from './autoPan'
 import { collectConnectedChain } from './blockStack'
-import { isCollision } from './collision_detecion'
 import { getDistance } from './distance'
 import { DragAndDrop } from './dnd'
+import { isConnectorHit } from './edgeBuilder'
 import type { EdgeBuilder } from './edgeBuilder'
-import { findEdgeAtPoint, isConnectorHit } from './edgeBuilder'
+import {
+  arbitrateHoveredNestingZones,
+  getOrderedSnapCandidates,
+  selectBestNestingZone,
+} from './interactionArbitration'
+import {
+  resolvePointerIntent,
+  findTopmostContainerAt as resolveTopmostContainerAt,
+} from './interactionTargets'
 import type { MarqueeRect } from './marquee'
 import { createMarqueeRect, getElementsInScreenMarquee } from './marquee'
 import type { MouseState, getMouseState } from './mouse'
@@ -46,6 +54,16 @@ export type InteractionConfig = {
   onResizeEnd?: (container: Container, command: MoveCommand | null) => void
   onEdgeSelect?: (edgeId: string | null) => void
   onHover?: (container: Container | null) => void
+  onContainerPointerDown?: (container: Container) => void
+  isContainerVisible?: (container: Container) => boolean
+  isConnectorVisible?: (connector: Connector) => boolean
+  isContainerLocked?: (container: Container) => boolean
+}
+
+type PendingUnnest = {
+  container: Container
+  zone: NestingZone
+  insertIndex: number
 }
 
 /**
@@ -73,6 +91,8 @@ export class InteractionManager {
 
   // グリッドスナップ用の仮想位置
   private gridVirtualPos: { x: number; y: number } | null = null
+  private dragPointerStart: IPosition | null = null
+  private pendingUnnest: PendingUnnest | null = null
 
   constructor(config: InteractionConfig) {
     this.config = config
@@ -106,135 +126,157 @@ export class InteractionManager {
     screenPos: IPosition,
     event: { button: number; shiftKey: boolean; target?: EventTarget | null }
   ): void {
-    // UI要素上でのクリックは無視
+    const nestingZones = this.config.nestingZones ?? []
+    const visibleContainers = this.getVisibleContainers()
+    const pointerIntent = resolvePointerIntent({
+      screenPos,
+      button: event.button,
+      target: event.target,
+      viewport: this.workspace.viewport,
+      connectors: this.config.connectors?.() ?? [],
+      edges: this.workspace.edges,
+      containers: visibleContainers,
+      nestingZones,
+      isContainerLocked: (container) => this.isContainerLocked(container),
+      isConnectorVisible: (connector) => this.isConnectorVisible(connector),
+    })
+
     if (
-      event.target &&
-      (event.target as HTMLElement).closest?.(
-        'input, textarea, select, button, .toolbar, .status-bar'
-      )
+      pointerIntent.kind !== 'edge' &&
+      pointerIntent.kind !== 'ignore' &&
+      pointerIntent.kind !== 'pan' &&
+      this.selectedEdgeId
     ) {
-      this.dragEligible = false
-      return
-    }
-
-    // 中ボタン → パン
-    if (event.button === 1) {
-      this.setMode('panning')
-      return
-    }
-
-    const wm = screenToWorld(screenPos, this.workspace.viewport)
-
-    // Connector ヒット → EdgeBuilder or 選択
-    const connectors = this.config.connectors?.() ?? []
-    for (const conn of connectors) {
-      if (isConnectorHit(wm, conn)) {
-        if (this._disableEdgeBuilder || !this.config.edgeBuilder) {
-          // move モード: コネクタを選択
-          const selection = this.workspace.selection
-          if (event.shiftKey) {
-            selection.toggleSelect(conn)
-          } else {
-            selection.deselectAll()
-            selection.select(conn)
-          }
-          this.dragEligible = false
-          return
-        }
-        // preview モード: EdgeBuilder 起動
-        this.config.edgeBuilder.start(conn)
-        this.dragEligible = false
-        this.setMode('edgeBuilding')
-        return
-      }
-    }
-
-    // Edge ヒット → Edge 選択
-    const edgeHit = findEdgeAtPoint(wm, this.workspace.edges)
-    if (edgeHit) {
-      this.workspace.selection.deselectAll()
-      this.selectedEdgeId = edgeHit.id
-      this.config.onEdgeSelect?.(edgeHit.id)
-      this.dragEligible = false
-      return
-    }
-
-    // Edge 選択解除
-    if (this.selectedEdgeId) {
       this.selectedEdgeId = null
       this.config.onEdgeSelect?.(null)
     }
 
-    // リサイズハンドル
-    const containers = this.config.containers()
-    for (const c of containers) {
-      if (!c.resizable) continue
-      const h = detectResizeHandle(wm, c, 10)
-      if (h) {
-        this.rState = beginResize(h, wm, c)
-        this.rStart = { x: c.position.x, y: c.position.y }
-        this.rContainer = c
+    switch (pointerIntent.kind) {
+      case 'ignore':
+        this.dragEligible = false
+        return
+
+      case 'pan':
+        this.setMode('panning')
+        return
+
+      case 'connector': {
+        if (this._disableEdgeBuilder || !this.config.edgeBuilder) {
+          const selection = this.workspace.selection
+          if (event.shiftKey) {
+            selection.toggleSelect(pointerIntent.connector)
+          } else {
+            selection.deselectAll()
+            selection.select(pointerIntent.connector)
+          }
+          this.dragEligible = false
+          this.pendingUnnest = null
+          return
+        }
+        this.config.edgeBuilder.start(pointerIntent.connector)
+        this.dragEligible = false
+        this.pendingUnnest = null
+        this.setMode('edgeBuilding')
+        return
+      }
+
+      case 'edge':
+        this.workspace.selection.deselectAll()
+        this.selectedEdgeId = pointerIntent.edge.id
+        this.config.onEdgeSelect?.(pointerIntent.edge.id)
+        this.dragEligible = false
+        this.pendingUnnest = null
+        return
+
+      case 'resize': {
+        const worldMouse = screenToWorld(screenPos, this.workspace.viewport)
+        const handle = detectResizeHandle(worldMouse, pointerIntent.container, 10)
+        if (!handle) return
+        this.config.onContainerPointerDown?.(pointerIntent.container)
+        this.rState = beginResize(handle, worldMouse, pointerIntent.container)
+        this.rStart = {
+          x: pointerIntent.container.position.x,
+          y: pointerIntent.container.position.y,
+        }
+        this.rContainer = pointerIntent.container
         this.setMode('resizing')
         return
       }
-    }
 
-    // コンテナヒットテスト（ネスト済みの子を親より先にチェック）
-    const nestingZones = this.config.nestingZones ?? []
-    const allNested = nestingZones.flatMap((z) => z.layout.Children as Container[])
-    const nestedSet = new Set(allNested)
-    const allHittable = [...allNested, ...containers.filter((c) => !nestedSet.has(c))]
-    const hit = allHittable.find((c) => isCollision(c, wm))
-
-    // ネスト済みコンテナをクリック → アンネスト
-    const hitZone = hit ? nestingZones.find((z) => z.isNested(hit)) : null
-    if (hit && hitZone) {
-      hitZone.unnest(hit)
-      this.config.onUnnest?.(hit, hitZone)
-      this.workspace.selection.deselectAll()
-      this.workspace.selection.select(hit)
-      if (!this._disableDrag) {
-        this.dragStarts = new Map()
-        this.dragStarts.set(hit.id, { x: hit.position.x, y: hit.position.y })
-        this._dragContainers = [hit]
-        this.dragEligible = true
-        this.gridVirtualPos = { x: hit.position.x, y: hit.position.y }
-        this.unlockSnapConnections()
-        this.setMode('dragging')
-      }
-      return
-    }
-
-    if (hit) {
-      // 選択管理
-      if (event.shiftKey) {
-        this.workspace.selection.toggleSelect(hit)
-      } else if (!hit.selected) {
+      case 'nested-container': {
+        const hit = pointerIntent.container
+        const hitZone = pointerIntent.zone
+        if (this.isContainerLocked(hit)) {
+          this.pendingUnnest = null
+          this.workspace.selection.deselectAll()
+          this.workspace.selection.select(hit)
+          return
+        }
+        this.pendingUnnest = this._disableDrag
+          ? null
+          : {
+              container: hit,
+              zone: hitZone,
+              insertIndex: Math.max(0, hitZone.layout.Children.indexOf(hit)),
+            }
+        this.config.onContainerPointerDown?.(hit)
         this.workspace.selection.deselectAll()
         this.workspace.selection.select(hit)
-      }
-
-      // ドラッグ準備（disableDrag 時はスキップ）
-      if (!this._disableDrag) {
-        this.dragStarts = new Map()
-        for (const s of this.workspace.selection.getSelection()) {
-          this.dragStarts.set(s.id, { x: s.position.x, y: s.position.y })
+        if (!this._disableDrag) {
+          this.dragStarts = new Map()
+          this.dragStarts.set(hit.id, { x: hit.position.x, y: hit.position.y })
+          this._dragContainers = [hit]
+          this.dragEligible = true
+          this.gridVirtualPos = { x: hit.position.x, y: hit.position.y }
+          this.dragPointerStart = { x: screenPos.x, y: screenPos.y }
+          this.unlockSnapConnections()
+          this.setMode('dragging')
         }
-        this._dragContainers = this.workspace.selection
-          .getSelection()
-          .filter((s) => containers.includes(s as Container)) as Container[]
-        this.dragEligible = true
-        this.unlockSnapConnections()
-
-        const ref = this._dragContainers[0] || hit
-        this.gridVirtualPos = { x: ref.position.x, y: ref.position.y }
-        this.setMode('dragging')
+        return
       }
-    } else {
-      // 空白クリック → マーキー選択
-      if (!event.shiftKey) this.workspace.selection.deselectAll()
-      this.marqueeOrigin = { x: screenPos.x, y: screenPos.y }
-      this.setMode('marquee')
+
+      case 'container': {
+        const hit = pointerIntent.container
+        this.pendingUnnest = null
+        this.config.onContainerPointerDown?.(hit)
+
+        if (event.shiftKey) {
+          this.workspace.selection.toggleSelect(hit)
+        } else if (!hit.selected) {
+          this.workspace.selection.deselectAll()
+          this.workspace.selection.select(hit)
+        }
+
+        if (!this._disableDrag && !this.isContainerLocked(hit)) {
+          this.dragStarts = new Map()
+          for (const selection of this.workspace.selection.getSelection()) {
+            this.dragStarts.set(selection.id, {
+              x: selection.position.x,
+              y: selection.position.y,
+            })
+          }
+          this._dragContainers = this.workspace.selection
+            .getSelection()
+            .filter((selection) =>
+              visibleContainers.includes(selection as Container)
+            ) as Container[]
+          this.dragEligible = true
+          this.unlockSnapConnections()
+
+          const ref = this._dragContainers[0] || hit
+          this.gridVirtualPos = { x: ref.position.x, y: ref.position.y }
+          this.dragPointerStart = { x: screenPos.x, y: screenPos.y }
+          this.setMode('dragging')
+        }
+        return
+      }
+
+      case 'empty':
+        this.pendingUnnest = null
+        if (!event.shiftKey) this.workspace.selection.deselectAll()
+        this.marqueeOrigin = { x: screenPos.x, y: screenPos.y }
+        this.setMode('marquee')
+        return
     }
   }
 
@@ -245,7 +287,9 @@ export class InteractionManager {
     // EdgeBuilder の完了/キャンセル
     if (this.config.edgeBuilder?.active) {
       const wm = screenToWorld(screenPos, this.workspace.viewport)
-      const connectors = this.config.connectors?.() ?? []
+      const connectors = (this.config.connectors?.() ?? []).filter((conn) =>
+        this.isConnectorVisible(conn)
+      )
       let found: Connector | null = null
       for (const conn of connectors) {
         if (isConnectorHit(wm, conn) && conn !== this.config.edgeBuilder.startConnector) {
@@ -261,17 +305,18 @@ export class InteractionManager {
     }
 
     // 移動判定
-    const hasMoved = this._dragContainers.some((c) => {
-      const s = this.dragStarts.get(c.id)
-      return s && (s.x !== c.position.x || s.y !== c.position.y)
-    })
+    const hasMoved = this.hasEffectiveDragMovement(screenPos)
 
     const nestingZones = this.config.nestingZones ?? []
     const hoveredZonesUp = nestingZones.filter((z) => z.hovered)
     const activeZone =
-      hoveredZonesUp.length > 1 ? this.selectBestZone(hoveredZonesUp) : (hoveredZonesUp[0] ?? null)
-    const bestSnapCandidate = this.getOrderedSnapCandidates(
+      hoveredZonesUp.length > 1
+        ? selectBestNestingZone(hoveredZonesUp)
+        : (hoveredZonesUp[0] ?? null)
+    const snapConnections = this.config.snapConnections ?? []
+    const bestSnapCandidate = getOrderedSnapCandidates(
       this._dragContainers as Container[],
+      snapConnections,
       true
     )[0]
 
@@ -284,13 +329,21 @@ export class InteractionManager {
     const shouldTrySnap =
       !activeZone || !bestSnapCandidate || bestSnapCandidate.priority >= activeZone.priority
 
+    let restoredUnnest = false
+    if (!hasMoved && this.pendingUnnest) {
+      restoredUnnest = this.restorePendingUnnest()
+    }
+
     if (this._dragContainers.length > 0 && hasMoved && shouldTrySnap) {
-      const snapConnections = this.config.snapConnections ?? []
-      const prevLocked = new Set(snapConnections.filter((c) => c.locked))
-      const candidates = this.getOrderedSnapCandidates(this._dragContainers as Container[], true)
-      for (const conn of candidates) {
-        conn.tick(worldMouse, this._dragContainers as Container[])
-        if (conn.locked && !prevLocked.has(conn)) {
+      const prevLocked = new Set(snapConnections.filter((connection) => connection.locked))
+      const candidates = getOrderedSnapCandidates(
+        this._dragContainers as Container[],
+        snapConnections,
+        true
+      )
+      for (const connection of candidates) {
+        connection.tick(worldMouse, this._dragContainers as Container[])
+        if (connection.locked && !prevLocked.has(connection)) {
           snapped = true
           break
         }
@@ -304,8 +357,9 @@ export class InteractionManager {
       dragContainersCount: this._dragContainers.length,
       hasMoved,
       snapped,
+      restoredUnnest,
     })
-    if (!snapped && this._dragContainers.length > 0 && activeZone && hasMoved) {
+    if (!restoredUnnest && !snapped && this._dragContainers.length > 0 && activeZone && hasMoved) {
       const nested = activeZone.hovered
       if (nested) {
         const chain = collectConnectedChain(nested).filter(
@@ -337,7 +391,7 @@ export class InteractionManager {
 
         this.config.onNest?.(nested, activeZone)
       }
-    } else if (this._dragContainers.length > 0 && this.dragStarts.size > 0) {
+    } else if (!restoredUnnest && this._dragContainers.length > 0 && this.dragStarts.size > 0) {
       // MoveCommand 記録
       const cmds: MoveCommand[] = []
       for (const c of this._dragContainers) {
@@ -354,7 +408,7 @@ export class InteractionManager {
 
     // マーキー完了
     if (this._mode === 'marquee') {
-      const containers = this.config.containers()
+      const containers = this.getVisibleContainers()
       const elems = containers.map((c) => ({
         id: c.id,
         position: c.position,
@@ -402,6 +456,8 @@ export class InteractionManager {
     this.rStart = null
     this.rContainer = null
     this.gridVirtualPos = null
+    this.dragPointerStart = null
+    this.pendingUnnest = null
     this.setMode('idle')
   }
 
@@ -451,13 +507,8 @@ export class InteractionManager {
 
     // ホバー検出（idle時のみ）
     if (this._mode === 'idle' && this.config.onHover) {
-      const containers = this.config.containers()
       const wm = screenToWorld(screenPos, this.workspace.viewport)
-      const nestingZones = this.config.nestingZones ?? []
-      const allNested = nestingZones.flatMap((z) => z.layout.Children as Container[])
-      const nestedSet = new Set(allNested)
-      const allHittable = [...allNested, ...containers.filter((c) => !nestedSet.has(c))]
-      const hovered = allHittable.find((c) => isCollision(c, wm)) ?? null
+      const hovered = this.findTopmostContainerAt(wm)
       this.config.onHover(hovered)
     }
 
@@ -480,11 +531,20 @@ export class InteractionManager {
       buttonState,
       mousePosition: screenToWorld(screenPos, this.workspace.viewport),
     }
+    if (
+      this.pendingUnnest &&
+      buttonState.leftButton === 'down' &&
+      this.hasEffectiveDragMovement(screenPos)
+    ) {
+      this.activatePendingUnnest()
+    }
     const nestingZonesForDnd = this.config.nestingZones ?? []
     const nestedInLayouts = new Set(
       nestingZonesForDnd.flatMap((z) => z.layout.Children as Container[])
     )
-    const dndContainers = this.config.containers().filter((c) => !nestedInLayouts.has(c))
+    const dndContainers = this.getVisibleContainers().filter(
+      (c) => !nestedInLayouts.has(c) && !this.isContainerLocked(c)
+    )
     this._dragContainers = DragAndDrop(
       dndContainers,
       wd,
@@ -505,38 +565,13 @@ export class InteractionManager {
     for (const zone of nestingZones) {
       zone.detectHover(this._dragContainers as Container[])
     }
-    // 複数zoneが競合した場合、最適なzoneのみ残す
-    let hoveredZones = nestingZones.filter((z) => z.hovered)
+    const hoveredZones = nestingZones.filter((z) => z.hovered)
     if (this._dragContainers.length > 0 && nestingZones.length > 0 && hoveredZones.length > 0) {
       console.debug('[InteractionManager] tick: zone hovered', {
         zones: nestingZones.map((z) => ({ target: z.target.id, hovered: z.hovered?.id })),
       })
     }
-    if (hoveredZones.length > 1) {
-      const winner = this.selectBestZone(hoveredZones)
-      for (const zone of hoveredZones) {
-        if (zone !== winner) zone.clearHover()
-      }
-    }
-
-    const snapPriorityBySource = this.getBestNearSnapPriorityBySource(
-      this._dragContainers as Container[]
-    )
-    for (const zone of nestingZones) {
-      if (!zone.hovered) continue
-      const snapPriority = snapPriorityBySource.get(zone.hovered.id)
-      if (snapPriority !== undefined && snapPriority >= zone.priority) {
-        zone.clearHover()
-      }
-    }
-
-    hoveredZones = nestingZones.filter((z) => z.hovered)
-    if (hoveredZones.length > 1) {
-      const winner = this.selectBestZone(hoveredZones)
-      for (const zone of hoveredZones) {
-        if (zone !== winner) zone.clearHover()
-      }
-    }
+    arbitrateHoveredNestingZones(this._dragContainers as Container[], nestingZones, snapConnections)
 
     // Auto-pan
     if (this._dragContainers.length > 0) {
@@ -576,73 +611,10 @@ export class InteractionManager {
     this.rState = null
     this.rContainer = null
     this.gridVirtualPos = null
+    this.dragPointerStart = null
+    this.pendingUnnest = null
     this._disableDrag = false
     this._disableEdgeBuilder = false
-  }
-
-  /** 複数のhoveredゾーンから最適なものを選ぶ（面積小優先 → 中心距離） */
-  private selectBestZone(zones: NestingZone[]): NestingZone {
-    const dragged = zones[0].hovered
-    if (!dragged) return zones[0]
-    const cx = dragged.position.x + dragged.width / 2
-    const cy = dragged.position.y + dragged.height / 2
-
-    return zones.reduce((best, zone) => {
-      if (zone.priority > best.priority) return zone
-      if (zone.priority < best.priority) return best
-      const bestArea = best.layout.width * best.layout.height
-      const zoneArea = zone.layout.width * zone.layout.height
-      if (zoneArea < bestArea) return zone
-      if (zoneArea > bestArea) return best
-      // 面積同じなら中心距離で比較
-      const bestAbs = best.layout.absolutePosition
-      const zoneAbs = zone.layout.absolutePosition
-      const bestDist = Math.hypot(
-        cx - (bestAbs.x + best.layout.width / 2),
-        cy - (bestAbs.y + best.layout.height / 2)
-      )
-      const zoneDist = Math.hypot(
-        cx - (zoneAbs.x + zone.layout.width / 2),
-        cy - (zoneAbs.y + zone.layout.height / 2)
-      )
-      return zoneDist < bestDist ? zone : best
-    })
-  }
-
-  private getOrderedSnapCandidates(
-    dragContainers: Container[],
-    requireInRange: boolean
-  ): SnapConnection[] {
-    const snapConnections = this.config.snapConnections ?? []
-    return snapConnections
-      .filter((conn) => {
-        if (conn.locked || conn.destroyed) return false
-        if (!dragContainers.includes(conn.source)) return false
-        if (!conn.strategy(conn.source, conn.target, dragContainers)) return false
-        if (conn.validator && !conn.validator()) return false
-        if (!requireInRange) return true
-        return getDistance(conn.sourcePosition, conn.targetPosition) < conn.snapDistance
-      })
-      .sort((a, b) => {
-        if (b.priority !== a.priority) return b.priority - a.priority
-        return (
-          getDistance(a.sourcePosition, a.targetPosition) -
-          getDistance(b.sourcePosition, b.targetPosition)
-        )
-      })
-  }
-
-  private getBestNearSnapPriorityBySource(dragContainers: Container[]): Map<string, number> {
-    const priorities = new Map<string, number>()
-
-    for (const conn of this.getOrderedSnapCandidates(dragContainers, true)) {
-      const current = priorities.get(conn.source.id)
-      if (current === undefined || conn.priority > current) {
-        priorities.set(conn.source.id, conn.priority)
-      }
-    }
-
-    return priorities
   }
 
   private unlockSnapConnections(): void {
@@ -655,5 +627,71 @@ export class InteractionManager {
         conn.unlock()
       }
     }
+  }
+
+  private hasDragPositionChanged(epsilon = 0.5): boolean {
+    return this._dragContainers.some((container) => {
+      const start = this.dragStarts.get(container.id)
+      if (!start) return false
+      return (
+        Math.abs(start.x - container.position.x) > epsilon ||
+        Math.abs(start.y - container.position.y) > epsilon
+      )
+    })
+  }
+
+  private hasEffectiveDragMovement(screenPos: IPosition): boolean {
+    if (this.hasDragPositionChanged()) return true
+    if (!this.dragPointerStart) return false
+    return getDistance(screenPos, this.dragPointerStart) >= 4
+  }
+
+  private restorePendingUnnest(): boolean {
+    const pending = this.pendingUnnest
+    if (!pending) return false
+
+    const chain = collectConnectedChain(pending.container).filter(
+      (container) => !pending.zone.layout.Children.includes(container)
+    )
+    if (chain.length === 0) return false
+
+    let insertIndex = Math.min(pending.insertIndex, pending.zone.layout.Children.length)
+    for (const container of chain) {
+      pending.zone.nest(container, insertIndex)
+      insertIndex += 1
+    }
+
+    this.config.onNest?.(pending.container, pending.zone)
+    return true
+  }
+
+  private activatePendingUnnest(): boolean {
+    const pending = this.pendingUnnest
+    if (!pending) return false
+    if (!pending.zone.isNested(pending.container)) return false
+
+    const unnested = pending.zone.unnest(pending.container)
+    if (!unnested) return false
+
+    this.config.onUnnest?.(pending.container, pending.zone)
+    return true
+  }
+
+  private findTopmostContainerAt(worldPos: IPosition): Container | null {
+    return resolveTopmostContainerAt(worldPos, this.getVisibleContainers())
+  }
+
+  private getVisibleContainers(): Container[] {
+    return this.config
+      .containers()
+      .filter((container) => this.config.isContainerVisible?.(container) ?? true)
+  }
+
+  private isConnectorVisible(connector: Connector): boolean {
+    return this.config.isConnectorVisible?.(connector) ?? true
+  }
+
+  private isContainerLocked(container: Container): boolean {
+    return this.config.isContainerLocked?.(container) ?? false
   }
 }

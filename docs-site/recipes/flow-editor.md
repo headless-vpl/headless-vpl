@@ -2,16 +2,26 @@
 
 ReactFlow スタイルのフロー型 VPL を構築する例です。
 
+## 現在の対応状況
+
+- sample には palette、inspector、typed connector validation、JSON export/import を追加済みです。
+- Showcase 全体の進捗一覧: [Showcase Roadmap](./showcase-roadmap.md)
+
 ## 基本構造
 
 ```typescript
 import {
-  Workspace, Container, Connector, Edge, Position,
-  SvgRenderer, InteractionManager, EdgeBuilder,
-  bindWheelZoom, bindDefaultShortcuts,
-} from 'headless-vpl'
-import { getMouseState } from 'headless-vpl/util/mouse'
-import { animate } from 'headless-vpl/util/animate'
+  Workspace,
+  Container,
+  Connector,
+  Edge,
+  Position,
+  SvgRenderer,
+} from 'headless-vpl/primitives'
+import { EdgeBuilder, bindWheelZoom } from 'headless-vpl/helpers'
+import { InteractionManager, bindDefaultShortcuts } from 'headless-vpl/recipes'
+import { getMouseState } from 'headless-vpl/utils/mouse'
+import { animate } from 'headless-vpl/utils/animate'
 
 const workspace = new Workspace()
 const svg = document.querySelector('#workspace') as SVGSVGElement
@@ -83,7 +93,7 @@ animate(() => {
 SVG レイヤーの上に React / Vue / vanilla DOM を被せてカスタム UI を実現:
 
 ```typescript
-import { DomSyncHelper } from 'headless-vpl'
+import { DomSyncHelper } from 'headless-vpl/helpers'
 
 const domSync = new DomSyncHelper({
   workspace,

@@ -90,4 +90,28 @@ describe('Connector anchor', () => {
     expect(entry.position.x).toBe(166)
     expect(entry.position.y).toBe(250)
   })
+
+  it('hit radius を使って別コネクタとの衝突判定ができる', () => {
+    const source = new Connector({
+      position: new Position(100, 100),
+      name: 'source',
+      type: 'output',
+      hitRadius: 12,
+    })
+    const near = new Connector({
+      position: new Position(120, 100),
+      name: 'near',
+      type: 'input',
+      hitRadius: 8,
+    })
+    const far = new Connector({
+      position: new Position(140, 100),
+      name: 'far',
+      type: 'input',
+      hitRadius: 8,
+    })
+
+    expect(source.collidesWith(near)).toBe(true)
+    expect(source.collidesWith(far)).toBe(false)
+  })
 })

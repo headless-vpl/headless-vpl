@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useTheme } from '../../../contexts/ThemeContext'
 import { useFactory } from '../../../contexts/FactoryContext'
 import { generateCode } from '../../../lib/headless-vpl/util/codeGenerator'
+import { serializeFactoryProject } from '../../../lib/headless-vpl/util/factorySerializer'
 
 type TabId = 'code' | 'json'
 
@@ -10,7 +11,7 @@ export function CodePanel() {
   const [code, setCode] = useState<string>('// Waiting for canvas changes...')
   const [jsonOutput, setJsonOutput] = useState<string>('{}')
   const { theme } = useTheme()
-  const { workspace, containers, revision } = useFactory()
+  const { workspace, containers, revision, actions, expandedNodeIds, hiddenIds, lockedIds } = useFactory()
   const [MonacoEditor, setMonacoEditor] = useState<React.ComponentType<{
     key: string
     height: string
@@ -38,17 +39,27 @@ export function CodePanel() {
     if (!workspace) return
     const generated = generateCode(containers, workspace.edges, workspace.elements)
     setCode(generated)
-    const json = {
-      containers: containers.map((c) => c.toJSON()),
-      edges: workspace.edges.map((e) => e.toJSON()),
-    }
-    setJsonOutput(JSON.stringify(json, null, 2))
-  }, [revision, workspace, containers])
+    const project = serializeFactoryProject(workspace, {
+      expandedNodeIds,
+      hiddenIds,
+      lockedIds,
+    })
+    setJsonOutput(JSON.stringify(project, null, 2))
+  }, [revision, workspace, containers, expandedNodeIds, hiddenIds, lockedIds])
 
   const handleCopy = useCallback(() => {
     const text = activeTab === 'code' ? code : jsonOutput
     navigator.clipboard.writeText(text)
   }, [activeTab, code, jsonOutput])
+
+  const handleImport = useCallback(() => {
+    const raw = window.prompt('Paste Factory project JSON')
+    if (!raw) return
+    const result = actions.importProject(raw)
+    if (!result.ok && result.error) {
+      window.alert(result.error)
+    }
+  }, [actions])
 
   return (
     <div className='factory-code-panel'>
@@ -71,6 +82,11 @@ export function CodePanel() {
           <button onClick={handleCopy} className='factory-code-btn'>
             Copy
           </button>
+          {activeTab === 'json' && (
+            <button onClick={handleImport} className='factory-code-btn'>
+              Import
+            </button>
+          )}
         </div>
       </div>
       <div className='factory-code-editor'>
