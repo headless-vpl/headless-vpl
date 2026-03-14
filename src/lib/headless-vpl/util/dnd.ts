@@ -1,6 +1,6 @@
 import type Container from '../core/Container'
 import type { IPosition } from '../core/Position'
-import { isCollision } from './collision_detecion'
+import { isCollision } from './collision_detection'
 import type { getMouseState } from './mouse'
 
 /**
