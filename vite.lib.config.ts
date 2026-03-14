@@ -13,9 +13,9 @@ export default defineConfig({
         'util/mouse': resolve(__dirname, 'src/lib/headless-vpl/util/mouse.ts'),
         'util/animate': resolve(__dirname, 'src/lib/headless-vpl/util/animate.ts'),
         'util/dnd': resolve(__dirname, 'src/lib/headless-vpl/util/dnd.ts'),
-        'util/collision_detecion': resolve(
+        'util/collision_detection': resolve(
           __dirname,
-          'src/lib/headless-vpl/util/collision_detecion.ts'
+          'src/lib/headless-vpl/util/collision_detection.ts'
         ),
         'util/domController': resolve(__dirname, 'src/lib/headless-vpl/util/domController.ts'),
       },

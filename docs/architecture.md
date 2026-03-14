@@ -142,7 +142,7 @@ src/lib/headless-vpl/
 │   ├── domSync.ts                 # DOM 同期ヘルパー
 │   ├── contentSize.ts             # DOM サイズ監視
 │   ├── animate.ts                 # requestAnimationFrame ループ
-│   ├── collision_detecion.ts      # AABB 当たり判定
+│   ├── collision_detection.ts     # AABB 当たり判定
 │   ├── distance.ts                # 距離・角度計算
 │   ├── domController.ts           # DOM 位置操作
 │   └── moveContainersGroup.ts     # コンテナグループ一括移動
