@@ -22,6 +22,7 @@ const AutoLayoutDemo = lazy(() => import('./pages/demos/AutoLayoutDemo'))
 const NestingDemo = lazy(() => import('./pages/demos/NestingDemo'))
 const SelectionDemo = lazy(() => import('./pages/demos/SelectionDemo'))
 const ZoomPanDemo = lazy(() => import('./pages/demos/ZoomPanDemo'))
+const MinimapDemo = lazy(() => import('./pages/demos/MinimapDemo'))
 const ResizeDemo = lazy(() => import('./pages/demos/ResizeDemo'))
 const UndoRedoDemo = lazy(() => import('./pages/demos/UndoRedoDemo'))
 const CopyPasteDemo = lazy(() => import('./pages/demos/CopyPasteDemo'))
@@ -165,6 +166,14 @@ const router = createHashRouter([
         element: (
           <Suspense fallback={<Loading />}>
             <ZoomPanDemo />
+          </Suspense>
+        ),
+      },
+      {
+        path: 'demos/minimap',
+        element: (
+          <Suspense fallback={<Loading />}>
+            <MinimapDemo />
           </Suspense>
         ),
       },

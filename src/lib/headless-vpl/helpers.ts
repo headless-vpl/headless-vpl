@@ -21,6 +21,20 @@ import {
 import { type PointerIntent, resolvePointerIntent } from './util/interactionTargets'
 import { type KeyBinding, KeyboardManager } from './util/keyboard'
 import {
+  type BindMinimapNavigationConfig,
+  type ComputeMinimapSnapshotConfig,
+  type MinimapBounds,
+  type MinimapElement,
+  type MinimapNodeRect,
+  type MinimapRect,
+  type MinimapSize,
+  type MinimapSnapshot,
+  type MinimapTransform,
+  bindMinimapNavigation,
+  collectMinimapElements,
+  computeMinimapSnapshot,
+} from './util/minimap'
+import {
   type ConnectorHitDetector,
   type NestingValidator,
   NestingZone,
@@ -63,6 +77,7 @@ import { type WheelZoomConfig, bindWheelZoom } from './util/wheelZoom'
 
 export {
   BlockStackController,
+  bindMinimapNavigation,
   DomSyncHelper,
   EdgeBuilder,
   KeyboardManager,
@@ -77,7 +92,9 @@ export {
   calculatePastePositions,
   canSnap,
   childOnly,
+  collectMinimapElements,
   collectConnectedChain,
+  computeMinimapSnapshot,
   computeAutoPan,
   computeConnectorSnapDistance,
   computeSnapDelta,
@@ -107,15 +124,24 @@ export {
 
 export type {
   AutoPanResult,
+  BindMinimapNavigationConfig,
   CanvasBounds,
   ClipboardData,
   ConnectionValidator,
+  ComputeMinimapSnapshotConfig,
   ConnectStackPairsConfig,
   ConnectorHitDetector,
   CreateSnapConnectionsConfig,
   DomSyncConfig,
   EdgeBuilderConfig,
   KeyBinding,
+  MinimapBounds,
+  MinimapElement,
+  MinimapNodeRect,
+  MinimapRect,
+  MinimapSize,
+  MinimapSnapshot,
+  MinimapTransform,
   NestingValidator,
   NestingZoneConfig,
   ObserveContainerContentSizesConfig,
