@@ -1,6 +1,10 @@
 import type { RefObject } from 'react'
 import AutoLayout from '../core/AutoLayout'
-import Connector, { type ConnectorAnchor, type ConnectorAnchorOrigin } from '../core/Connector'
+import Connector, {
+  type ConnectorAnchor,
+  type ConnectorAnchorOrigin,
+  resolveConnectorAnchorOffset,
+} from '../core/Connector'
 import Container from '../core/Container'
 import Edge from '../core/Edge'
 import type { MovableObject } from '../core/MovableObject'
@@ -132,17 +136,18 @@ function toRelativePosition(child: { position: { x: number; y: number } }, paren
 
 function serializeAnchor(anchor: ConnectorAnchor | null): SerializedAnchor | undefined {
   if (!anchor) return undefined
+  const offset = resolveConnectorAnchorOffset(anchor.offset)
   if (anchor.target === 'parent' || typeof anchor.target === 'string') {
     return {
       target: anchor.target,
       origin: anchor.origin,
-      offset: anchor.offset,
+      offset,
     }
   }
   return {
     target: { refId: anchor.target.id },
     origin: anchor.origin,
-    offset: anchor.offset,
+    offset,
   }
 }
 

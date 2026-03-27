@@ -1,10 +1,10 @@
 import AutoLayout from './core/AutoLayout'
-import Connector from './core/Connector'
+import Connector, { resolveConnectorAnchorOffset } from './core/Connector'
 import Container from './core/Container'
 import Edge from './core/Edge'
 import { EventBus } from './core/EventBus'
 import { History } from './core/History'
-import Position from './core/Position'
+import Position, { resolvePosition } from './core/Position'
 import { SelectionManager } from './core/SelectionManager'
 import Workspace from './core/Workspace'
 import {
@@ -32,11 +32,13 @@ import { screenToWorld, worldToScreen } from './util/viewport'
 export {
   AutoLayout,
   Connector,
+  resolveConnectorAnchorOffset,
   Container,
   Edge,
   EventBus,
   History,
   Position,
+  resolvePosition,
   SelectionManager,
   Workspace,
   AddCommand,
@@ -83,9 +85,10 @@ export type {
   EdgeMarker,
   ResizeHandleDirection,
 } from './core/types'
-export type { IPosition } from './core/Position'
+export type { IPosition, PositionLike } from './core/Position'
 export type {
   ConnectorAnchor,
+  ConnectorAnchorOffset,
   ConnectorAnchorOrigin,
   ConnectorAnchorTarget,
 } from './core/Connector'

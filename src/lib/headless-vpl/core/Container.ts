@@ -1,7 +1,7 @@
 import AutoLayout from './AutoLayout'
 import Connector from './Connector'
 import { MovableObject } from './MovableObject'
-import Position from './Position'
+import Position, { type PositionLike, resolvePosition } from './Position'
 import type Workspace from './Workspace'
 import type { Padding, SizingMode } from './types'
 
@@ -10,7 +10,7 @@ type ContainerProps<
   T extends { [key: string]: MovableObject | AutoLayout } = {},
 > = {
   workspace?: Workspace
-  position?: Position
+  position?: PositionLike
   name: string
   color?: string
   width?: number
@@ -47,7 +47,7 @@ class Container<
 
   constructor({
     workspace,
-    position = new Position(0, 0),
+    position: positionInput = new Position(0, 0),
     name,
     color,
     width,
@@ -63,6 +63,7 @@ class Container<
     contentGap,
     children,
   }: ContainerProps<T>) {
+    const position = resolvePosition(positionInput)
     super(workspace, position, name, 'container')
     this.color = color || 'red'
     this.width = width || 100

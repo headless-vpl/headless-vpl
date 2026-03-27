@@ -1,15 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
 import Workspace from '../../../lib/headless-vpl/core/Workspace';
-import {
-  type CreatedBlock,
-  BLOCK_DEFS,
-  C_HEADER_H,
-  getBlockSize,
-} from './defs';
-import { registerSlotZones } from './interactions';
+import type { CreatedBlock } from './types';
+import { BLOCK_DEFS, C_HEADER_H, getBlockSize } from './blocks';
+import { registerSlotZones } from './connections';
 import { relayoutSlotsAndFitBlock, syncBodyLayoutChain } from './layout';
-import { buildBlockRegistry, createBlock } from './scene';
+import { buildBlockRegistry } from './sample-scene';
+import { createBlock } from './factory';
 
 function centerBlockOnSlot(target: CreatedBlock, inputIndex: number, dragged: CreatedBlock) {
   const slot = target.slotLayouts.find((item) => item.info.inputIndex === inputIndex);

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { AutoLayout, Container, Position, Workspace } from '../../../lib/headless-vpl'
-import { collectFrontGroup, sortContainersForNestedRender } from './ordering'
+import { collectFrontGroup, sortContainersForNestedRender } from '../../../lib/headless-vpl/blocks'
 
 describe('block editor render ordering', () => {
   it('keeps nested children after their parent in render order', () => {

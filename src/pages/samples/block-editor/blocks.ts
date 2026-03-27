@@ -1,137 +1,25 @@
-import type { AutoLayout, Connector, Container } from '../../../lib/headless-vpl';
+// ブロック定義・寸法定数・ヘルパー関数
+import type {
+  BlockDef,
+  BlockShape,
+  BlockState,
+  InputDef,
+  ShapeConfig,
+  SlotInfo,
+  ValueBlockShape,
+} from './types';
 
-export type BlockShape =
-  | 'hat'
-  | 'stack'
-  | 'c-block'
-  | 'c-block-else'
-  | 'cap-c'
-  | 'reporter'
-  | 'boolean';
-
-export type ValueBlockShape = 'reporter' | 'boolean';
-
-export type InputDef =
-  | {
-      type: 'number';
-      default: number;
-      minWidth?: number;
-      maxWidth?: number;
-    }
-  | {
-      type: 'text';
-      default: string;
-      minWidth?: number;
-      maxWidth?: number;
-    }
-  | {
-      type: 'dropdown';
-      default: string;
-      options: string[];
-      minWidth?: number;
-      maxWidth?: number;
-    }
-  | {
-      type: 'boolean-slot';
-      minWidth?: number;
-      maxWidth?: number;
-    }
-  | { type: 'label'; text: string };
-
-export type BlockDef = {
-  name: string;
-  shape: BlockShape;
-  color: string;
-  inputs: InputDef[];
-};
-
-export type BlockState = {
-  id: string;
-  def: BlockDef;
-  inputValues: Record<number, string>;
-};
-
-export type CBlockRef = {
-  container: Container;
-  bodyLayouts: AutoLayout[];
-  bodyEntryConnectors: Connector[];
-  bottomConnector: Connector | null;
-};
-
-export type SlotInfo = {
-  inputIndex: number;
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-  acceptedShapes: ValueBlockShape[];
-};
-
-export type SlotLayoutRef = {
-  info: SlotInfo;
-  layout: AutoLayout;
-  connector: Connector | null;
-};
-
-export type CreatedBlock = {
-  container: Container;
-  topConn: Connector | null;
-  bottomConn: Connector | null;
-  cBlockRef: CBlockRef | null;
-  slotLayouts: SlotLayoutRef[];
-  valueConnector: Connector | null;
-  state: BlockState;
-};
-
-export type BlockRegistry = {
-  blockMap: Map<string, BlockState>;
-  createdMap: Map<string, CreatedBlock>;
-  containerMap: Map<string, Container>;
-};
-
-export type SlotZoneMeta = {
-  blockId: string;
-  inputIndex: number;
-};
-
-export type BodyZoneMeta = {
-  bodyEntryConnector: Connector | undefined;
-};
-
-export type BodyLayoutHit = {
-  insertIndex: number;
-  targetConnector: Connector;
-  draggedBlock: CreatedBlock;
-};
-
-export type SampleScene = {
-  created: CreatedBlock[];
-  flag: CreatedBlock;
-  move1: CreatedBlock;
-  turn1: CreatedBlock;
-  say1: CreatedBlock;
-  repeat1: CreatedBlock;
-  moveInRepeat: CreatedBlock;
-  turnInRepeat: CreatedBlock;
-  keyPress: CreatedBlock;
-  if1: CreatedBlock;
-};
-
-export const STACK_W = 200;
-export const STACK_H = 42;
-export const HAT_H = 52;
-export const C_W = 220;
-export const C_HEADER_H = 40;
-export const C_BODY_MIN_H = 40;
-export const C_FOOTER_H = 20;
-export const C_DIVIDER_H = 28;
+// --- 寸法定数 ---
+export const CONN_OFFSET_X = 40;
 export const C_BODY_ENTRY_OFFSET_X = 50;
 export const C_BODY_ENTRY_OFFSET_Y = 0;
 export const C_BODY_ENTRY_HIT_RADIUS = 8;
 export const C_BODY_LAYOUT_OFFSET_X = 16;
-export const REPORTER_W = 140;
-export const REPORTER_H = 32;
-export const CONN_OFFSET_X = 40;
+export const C_BODY_MIN_H = 40;
+export const C_HEADER_H = 40;
+export const C_FOOTER_H = 20;
+export const C_DIVIDER_H = 28;
+export const C_W = 220;
 export const INLINE_PADDING_X = 12;
 export const INLINE_GAP = 6;
 export const INLINE_SLOT_BASE_H = 24;
@@ -143,12 +31,42 @@ export const INPUT_TEXT_MIN_W = 64;
 export const INPUT_DROPDOWN_MIN_W = 80;
 export const INPUT_MAX_W = 180;
 
+// --- ShapeConfig: shape固有のロジックを1箇所に集約 ---
+export const SHAPE_CONFIGS: Record<BlockShape, ShapeConfig> = {
+  hat:            { size: { w: 200, h: 52 },  connectors: { top: false, bottom: true } },
+  stack:          { size: { w: 200, h: 42 },  connectors: { top: true,  bottom: true } },
+  'c-block':      { size: { w: C_W, h: C_HEADER_H + C_BODY_MIN_H + C_FOOTER_H },
+                    connectors: { top: true, bottom: true },
+                    bodies: [{ minHeight: C_BODY_MIN_H }] },
+  'c-block-else': { size: { w: C_W, h: C_HEADER_H + C_BODY_MIN_H + C_DIVIDER_H + C_BODY_MIN_H + C_FOOTER_H },
+                    connectors: { top: true, bottom: true },
+                    bodies: [{ minHeight: C_BODY_MIN_H }, { minHeight: C_BODY_MIN_H }] },
+  'cap-c':        { size: { w: C_W, h: C_HEADER_H + C_BODY_MIN_H + C_FOOTER_H },
+                    connectors: { top: true, bottom: false },
+                    bodies: [{ minHeight: C_BODY_MIN_H }] },
+  reporter:       { size: { w: 140, h: 32 }, connectors: { top: false, bottom: false, value: true } },
+  boolean:        { size: { w: 140, h: 32 }, connectors: { top: false, bottom: false, value: true } },
+};
+
+// --- ShapeConfigベースのヘルパー関数 ---
+export function getBlockSize(shape: BlockShape): { w: number; h: number } {
+  return SHAPE_CONFIGS[shape].size;
+}
+
+export function hasTopConnector(shape: BlockShape): boolean {
+  return SHAPE_CONFIGS[shape].connectors.top;
+}
+
+export function hasBottomConnector(shape: BlockShape): boolean {
+  return SHAPE_CONFIGS[shape].connectors.bottom;
+}
+
 export function isCBlockShape(shape: BlockShape): boolean {
-  return shape === 'c-block' || shape === 'c-block-else' || shape === 'cap-c';
+  return !!SHAPE_CONFIGS[shape].bodies;
 }
 
 export function isInlineValueShape(shape: BlockShape): boolean {
-  return shape === 'reporter' || shape === 'boolean';
+  return !!SHAPE_CONFIGS[shape].connectors.value;
 }
 
 export function isValueBlockShape(shape: BlockShape): shape is ValueBlockShape {
@@ -243,7 +161,8 @@ export function computeSlotPositions(
 ): SlotInfo[] {
   let cursor =
     INLINE_PADDING_X + estimateTextWidth(def.name) + (def.name ? INLINE_GAP : 0);
-  const blockH = def.shape === 'hat' ? HAT_H : isCBlockShape(def.shape) ? C_HEADER_H : STACK_H;
+  const shapeConfig = SHAPE_CONFIGS[def.shape];
+  const blockH = isCBlockShape(def.shape) ? C_HEADER_H : shapeConfig.size.h;
   const slotY = (blockH - INLINE_SLOT_BASE_H) / 2;
   const slots: SlotInfo[] = [];
 
@@ -264,34 +183,6 @@ export function computeSlotPositions(
   }
 
   return slots;
-}
-
-export function hasTopConnector(shape: BlockShape): boolean {
-  return shape !== 'hat' && !isInlineValueShape(shape);
-}
-
-export function hasBottomConnector(shape: BlockShape): boolean {
-  return shape !== 'cap-c' && !isInlineValueShape(shape);
-}
-
-export function getBlockSize(shape: BlockShape): { w: number; h: number } {
-  switch (shape) {
-    case 'hat':
-      return { w: STACK_W, h: HAT_H };
-    case 'reporter':
-      return { w: REPORTER_W, h: REPORTER_H };
-    case 'boolean':
-      return { w: REPORTER_W, h: REPORTER_H };
-    case 'c-block':
-      return { w: C_W, h: C_HEADER_H + C_BODY_MIN_H + C_FOOTER_H };
-    case 'c-block-else':
-      return {
-        w: C_W,
-        h: C_HEADER_H + C_BODY_MIN_H + C_DIVIDER_H + C_BODY_MIN_H + C_FOOTER_H,
-      };
-    default:
-      return { w: STACK_W, h: STACK_H };
-  }
 }
 
 export const BLOCK_DEFS: BlockDef[] = [
