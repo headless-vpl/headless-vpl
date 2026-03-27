@@ -31,6 +31,7 @@ export const sidebarNavGroups: NavGroup[] = [
       { label: 'Nesting', path: '/demos/nesting' },
       { label: 'Selection', path: '/demos/selection' },
       { label: 'Zoom & Pan', path: '/demos/zoom-pan' },
+      { label: 'Minimap', path: '/demos/minimap' },
       { label: 'Resize', path: '/demos/resize' },
       { label: 'Undo / Redo', path: '/demos/undo-redo' },
       { label: 'Copy / Paste', path: '/demos/copy-paste' },

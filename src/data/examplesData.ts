@@ -236,6 +236,31 @@ const interaction = new InteractionManager({
     difficulty: 'beginner',
   },
   {
+    title: 'Minimap',
+    description: 'ミニマップ API と viewport ナビゲーション',
+    path: '/demos/minimap',
+    category: 'demos',
+    color: '#0ea5e9',
+    subCategory: 'navigation',
+    difficulty: 'beginner',
+    longDescription:
+      'Minimap demo は headless API の最小利用例です。`collectMinimapElements()` で矩形要素を集め、`computeMinimapSnapshot()` で minimap 描画データを作り、`bindMinimapNavigation()` でクリック / ドラッグを workspace pan に変換します。Rete の minimap example と同様に、描画と interaction を分離したまま UI だけ自由に差し替えられます。',
+    codeSnippet: `const snapshot = computeMinimapSnapshot({
+  workspace,
+  elements: collectMinimapElements(workspace.elements),
+  canvas: { width: canvasRect.width, height: canvasRect.height },
+  size: { width: 220, height: 140 },
+  padding: 10,
+  boundViewport: true,
+})
+
+const cleanup = bindMinimapNavigation(minimapElement, {
+  workspace,
+  getSnapshot: () => snapshot,
+  getCanvasSize: () => ({ width: canvasRect.width, height: canvasRect.height }),
+})`,
+  },
+  {
     title: 'Resize',
     description: 'ノードリサイズ',
     path: '/demos/resize',
