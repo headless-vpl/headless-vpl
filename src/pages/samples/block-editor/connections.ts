@@ -1,5 +1,6 @@
+// ブロック接続・ゾーン登録・近接判定
 import { createSlotZone } from '../../../lib/headless-vpl/util/nesting';
-import { createSnapConnections } from '../../../lib/headless-vpl/util/snap';
+import { createStackSnapConnections } from '../../../lib/headless-vpl/util/snap';
 import {
   createConnectorInsertZone,
   isConnectorColliding,
@@ -7,26 +8,21 @@ import {
 import { NestingZone } from '../../../lib/headless-vpl';
 import type {
   Container,
-  Position,
   SnapConnection,
   Workspace,
 } from '../../../lib/headless-vpl';
+import type { ProximityHit } from '../../../lib/headless-vpl/blocks';
+import type {
+  BlockRegistry,
+  BodyZoneMeta,
+  CBlockRef,
+  CreatedBlock,
+  SlotZoneMeta,
+} from './types';
+import { isValueBlockShape } from './blocks';
 import {
-  type BlockRegistry,
-  type BodyZoneMeta,
-  type CBlockRef,
-  type CreatedBlock,
-  type SlotZoneMeta,
-  isValueBlockShape,
-} from './defs';
-import {
-  alignCBlockBodyEntryConnectors,
-  detachFromBodyLayoutChain,
-  findBodyLayoutForBlock,
   findBodyLayoutHit,
-  findCBlockRefForBodyLayout,
   hasPriorityCBlockBodyHit,
-  syncBodyLayoutChain,
 } from './layout';
 
 function createBooleanSlotZone(
@@ -69,18 +65,13 @@ export function registerSnapConnections(
   );
 
   snapConnections.push(
-    ...createSnapConnections({
+    ...createStackSnapConnections({
       workspace: ws,
       items: connectable,
-      sourceContainer: (block) => (block.topConn ? block.container : null),
-      sourcePosition: (block) => block.topConn?.position,
-      targetContainer: (block) => (block.bottomConn ? block.container : null),
-      targetPosition: (block) => block.bottomConn?.position,
-      snapDistance: ({ source, target }) =>
-        source.topConn && target.bottomConn
-          ? source.topConn.hitRadius + target.bottomConn.hitRadius
-          : undefined,
-      priority: () => 100,
+      getContainer: (block) => block.container,
+      getTopConnector: (block) => block.topConn,
+      getBottomConnector: (block) => block.bottomConn,
+      priority: 100,
       validator: ({ source, target }) => () => {
         if (hasPriorityCBlockBodyHit(source, target, createdMap)) {
           return false;
@@ -170,103 +161,11 @@ export function registerSlotZones(
   }
 }
 
-export function subscribeCBlockConnectionSync(
-  ws: Workspace,
-  containerMap: Map<string, Container>,
-  cBlockRefs: CBlockRef[],
-  onBodyLayoutChange?: () => void,
-) {
-  const unsubConnect = ws.eventBus.on('connect', (event) => {
-    const parentId = event.data?.parent as string | undefined;
-    const childId = event.data?.child as string | undefined;
-    if (!parentId || !childId) return;
-
-    const parentContainer = containerMap.get(parentId);
-    const childContainer = containerMap.get(childId);
-    if (!parentContainer || !childContainer) return;
-
-    const layout = findBodyLayoutForBlock(parentContainer, cBlockRefs);
-    if (!layout) return;
-
-    if (layout.Children.includes(childContainer)) {
-      syncBodyLayoutChain(layout);
-      const owner = findCBlockRefForBodyLayout(layout, cBlockRefs);
-      if (owner) {
-        alignCBlockBodyEntryConnectors(owner);
-      }
-      onBodyLayoutChange?.();
-      return;
-    }
-
-    const prevLayout = findBodyLayoutForBlock(childContainer, cBlockRefs);
-    if (prevLayout && prevLayout !== layout) {
-      detachFromBodyLayoutChain(prevLayout, childContainer);
-      prevLayout.removeElement(childContainer);
-      syncBodyLayoutChain(prevLayout);
-      const prevOwner = findCBlockRefForBodyLayout(prevLayout, cBlockRefs);
-      if (prevOwner) {
-        alignCBlockBodyEntryConnectors(prevOwner);
-      }
-      onBodyLayoutChange?.();
-    }
-
-    const parentIndex = layout.Children.indexOf(parentContainer);
-    layout.insertElement(childContainer, parentIndex + 1);
-    syncBodyLayoutChain(layout);
-    const owner = findCBlockRefForBodyLayout(layout, cBlockRefs);
-    if (owner) {
-      alignCBlockBodyEntryConnectors(owner);
-    }
-    onBodyLayoutChange?.();
-  });
-
-  const unsubDisconnect = ws.eventBus.on('disconnect', (event) => {
-    const childId = event.data?.child as string | undefined;
-    if (!childId) return;
-
-    const childContainer = containerMap.get(childId);
-    if (!childContainer) return;
-
-    const layout = findBodyLayoutForBlock(childContainer, cBlockRefs);
-    if (!layout) return;
-
-    detachFromBodyLayoutChain(layout, childContainer);
-    layout.removeElement(childContainer);
-    syncBodyLayoutChain(layout);
-    const owner = findCBlockRefForBodyLayout(layout, cBlockRefs);
-    if (owner) {
-      alignCBlockBodyEntryConnectors(owner);
-    }
-    onBodyLayoutChange?.();
-  });
-
-  return () => {
-    unsubConnect();
-    unsubDisconnect();
-  };
-}
-
 export function collectBodyZoneProximityHits(
   bodyZoneMap: Map<NestingZone, BodyZoneMeta>,
   createdMap: Map<string, CreatedBlock>,
-): Map<
-  string,
-  {
-    source: Container;
-    sourcePosition: Position;
-    targetPosition: Position;
-    snapDistance: number;
-  }
-> {
-  const hits = new Map<
-    string,
-    {
-      source: Container;
-      sourcePosition: Position;
-      targetPosition: Position;
-      snapDistance: number;
-    }
-  >();
+): Map<string, ProximityHit> {
+  const hits = new Map<string, ProximityHit>();
 
   for (const [zone, meta] of bodyZoneMap.entries()) {
     const dragged = zone.hovered;
@@ -294,33 +193,3 @@ export function collectBodyZoneProximityHits(
   return hits;
 }
 
-export function syncBodyZoneProximityHighlights(
-  ws: Workspace,
-  activeIds: Set<string>,
-  nextHits: Map<
-    string,
-    {
-      source: Container;
-      sourcePosition: Position;
-      targetPosition: Position;
-      snapDistance: number;
-    }
-  >,
-): void {
-  for (const connectionId of Array.from(activeIds)) {
-    if (nextHits.has(connectionId)) continue;
-    ws.eventBus.emit('proximity-end', ws, { connectionId });
-    activeIds.delete(connectionId);
-  }
-
-  for (const [connectionId, hit] of nextHits.entries()) {
-    if (activeIds.has(connectionId)) continue;
-    ws.eventBus.emit('proximity', hit.source, {
-      connectionId,
-      sourcePosition: hit.sourcePosition,
-      targetPosition: hit.targetPosition,
-      snapDistance: hit.snapDistance,
-    });
-    activeIds.add(connectionId);
-  }
-}

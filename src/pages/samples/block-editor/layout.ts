@@ -1,13 +1,20 @@
+// ブロックレイアウト管理
 import {
   BlockStackController,
   collectConnectedChain,
+  findBodyLayoutForBlock,
+  findCBlockOwner,
+  findCBlockRefForBodyLayout,
   findConnectorInsertHit,
+  isCBlockBodyLayout,
 } from '../../../lib/headless-vpl/blocks';
 import type { AutoLayout, Connector, Container } from '../../../lib/headless-vpl';
+import type {
+  BodyLayoutHit,
+  CBlockRef,
+  CreatedBlock,
+} from './types';
 import {
-  type BodyLayoutHit,
-  type CBlockRef,
-  type CreatedBlock,
   C_HEADER_H,
   C_BODY_MIN_H,
   C_W,
@@ -19,34 +26,12 @@ import {
   inputWidth,
   estimateTextWidth,
   isCBlockShape,
-} from './defs';
+} from './blocks';
 
 const blockStack = new BlockStackController();
 
-export function findBodyLayoutForBlock(
-  blockContainer: Container,
-  cBlockRefs: CBlockRef[],
-): AutoLayout | null {
-  for (const ref of cBlockRefs) {
-    for (const layout of ref.bodyLayouts) {
-      if (layout.Children.includes(blockContainer)) {
-        return layout;
-      }
-    }
-  }
-  return null;
-}
-
-export function reattachContainerToParent(
-  container: Container,
-  expectedParent: Container | null,
-) {
-  blockStack.reattach(container, expectedParent);
-}
-
-export function normalizeContainerChain(containers: Container[]) {
-  blockStack.normalize(containers);
-}
+// ライブラリ関数を re-export（後方互換性のため）
+export { findBodyLayoutForBlock, findCBlockOwner, findCBlockRefForBodyLayout, isCBlockBodyLayout };
 
 export function detachFromBodyLayoutChain(layout: AutoLayout, container: Container) {
   blockStack.detachFromLayout(layout, container);
@@ -54,13 +39,6 @@ export function detachFromBodyLayoutChain(layout: AutoLayout, container: Contain
 
 export function syncBodyLayoutChain(layout: AutoLayout) {
   blockStack.syncLayout(layout);
-}
-
-export function isCBlockBodyLayout(layout: AutoLayout, cBlockRefs: CBlockRef[]): boolean {
-  for (const ref of cBlockRefs) {
-    if (ref.bodyLayouts.includes(layout)) return true;
-  }
-  return false;
 }
 
 export function pullFollowerChainOutOfBodyLayout(root: Container, layout: AutoLayout) {
@@ -120,16 +98,6 @@ export function hasPriorityCBlockBodyHit(
 
 export function alignCBlockBodyEntryConnectors(cBlockRef: CBlockRef): void {
   cBlockRef.container.refreshAnchoredChildren();
-}
-
-export function findCBlockRefForBodyLayout(
-  layout: AutoLayout,
-  cBlockRefs: CBlockRef[],
-): CBlockRef | null {
-  for (const ref of cBlockRefs) {
-    if (ref.bodyLayouts.includes(layout)) return ref;
-  }
-  return null;
 }
 
 function syncDetachedStackFollowers(root: Container): void {

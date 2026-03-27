@@ -1,31 +1,38 @@
+// ブロックエディタ コントローラー
 import type {
+  AutoLayout,
   Container,
   InteractionConfig,
   NestingZone,
   SnapConnection,
   Workspace,
 } from '../../../lib/headless-vpl';
-import { collectConnectedChain } from '../../../lib/headless-vpl/blocks';
-import { observeContainerContentSizes } from '../../../lib/headless-vpl/blocks';
+import {
+  collectConnectedChain,
+  collectFrontGroup,
+  observeContainerContentSizes,
+  sortContainersForNestedRender,
+  subscribeCBlockConnectionSync,
+  startProximityLoop,
+  syncProximityHighlights,
+  findCBlockRefForBodyLayout,
+  isCBlockBodyLayout,
+} from '../../../lib/headless-vpl/blocks';
 import type {
   BlockState,
   BodyZoneMeta,
   CBlockRef,
   CreatedBlock,
   SlotZoneMeta,
-} from './defs';
+} from './types';
 import {
   collectBodyZoneProximityHits,
   registerCBlockBodyZones,
   registerSlotZones,
   registerSnapConnections,
-  subscribeCBlockConnectionSync,
-  syncBodyZoneProximityHighlights,
-} from './interactions';
+} from './connections';
 import {
   alignCBlockBodyEntryConnectors,
-  findCBlockRefForBodyLayout,
-  isCBlockBodyLayout,
   pullFollowerChainOutOfBodyLayout,
   relayoutBlockAndAncestors,
   relayoutCreatedBlocks,
@@ -37,11 +44,9 @@ import {
   connectInitialScene,
   resetEditorWorkspace,
   seedInitialCBlockNest,
-} from './scene';
-import {
-  collectFrontGroup,
-  sortContainersForNestedRender,
-} from './ordering';
+} from './sample-scene';
+
+// --- コントローラー本体 ---
 
 export type BlockEditorSnapshot = {
   blocks: BlockState[];
@@ -53,24 +58,13 @@ const EMPTY_SNAPSHOT: BlockEditorSnapshot = {
   nestedSlots: {},
 };
 
-function replaceMap<K, V>(target: Map<K, V>, source: Map<K, V>) {
-  target.clear();
-  for (const [key, value] of source.entries()) {
-    target.set(key, value);
-  }
-}
-
-function slotKey(blockId: string, inputIndex: number): string {
-  return `${blockId}-${inputIndex}`;
-}
-
 export class BlockEditorController {
   private readonly listeners = new Set<() => void>();
   private snapshot: BlockEditorSnapshot = EMPTY_SNAPSHOT;
 
   private workspace: Workspace | null = null;
   private containers: Container[] = [];
-  private proximityFrameId = 0;
+  private stopProximityLoop: (() => void) | null = null;
   private stopConnectionSync: (() => void) | null = null;
   private stopSizeObservers: (() => void) | null = null;
 
@@ -85,11 +79,13 @@ export class BlockEditorController {
   readonly nestingZones: NestingZone[] = [];
   readonly cBlockRefs: CBlockRef[] = [];
 
-  private readonly handleNest: NonNullable<InteractionConfig['onNest']> = (
-    container,
-    zone,
-  ) => {
+  private handleNestChange(
+    container: Container,
+    zone: NestingZone,
+    isNest: boolean,
+  ): void {
     if (isCBlockBodyLayout(zone.layout, this.cBlockRefs)) {
+      if (!isNest) pullFollowerChainOutOfBodyLayout(container, zone.layout);
       syncBodyLayoutChain(zone.layout);
       const owner = findCBlockRefForBodyLayout(zone.layout, this.cBlockRefs);
       if (owner) {
@@ -103,47 +99,19 @@ export class BlockEditorController {
     const slotInfo = this.slotZoneMap.get(zone);
     if (slotInfo) {
       relayoutBlockAndAncestors(slotInfo.blockId, this.createdMap);
-      this.setNestedSlot(slotInfo.blockId, slotInfo.inputIndex, container.id);
+      this.setNestedSlot(slotInfo.blockId, slotInfo.inputIndex, isNest ? container.id : null);
     }
 
-    const emitted = this.syncRenderOrder();
-    if (!emitted) {
+    if (!this.syncRenderOrder()) {
       this.bumpRevision();
     }
-  };
-
-  private readonly handleUnnest: NonNullable<InteractionConfig['onUnnest']> = (
-    container,
-    zone,
-  ) => {
-    if (isCBlockBodyLayout(zone.layout, this.cBlockRefs)) {
-      pullFollowerChainOutOfBodyLayout(container, zone.layout);
-      const owner = findCBlockRefForBodyLayout(zone.layout, this.cBlockRefs);
-      if (owner) {
-        alignCBlockBodyEntryConnectors(owner);
-        relayoutBlockAndAncestors(owner.container.id, this.createdMap);
-      } else {
-        this.bumpRevision();
-      }
-    }
-
-    const slotInfo = this.slotZoneMap.get(zone);
-    if (slotInfo) {
-      relayoutBlockAndAncestors(slotInfo.blockId, this.createdMap);
-      this.setNestedSlot(slotInfo.blockId, slotInfo.inputIndex, null);
-    }
-
-    const emitted = this.syncRenderOrder();
-    if (!emitted) {
-      this.bumpRevision();
-    }
-  };
+  }
 
   readonly interactionOverrides: Partial<InteractionConfig> = {
     snapConnections: this.snapConnections,
     nestingZones: this.nestingZones,
-    onNest: this.handleNest,
-    onUnnest: this.handleUnnest,
+    onNest: (container, zone) => this.handleNestChange(container, zone, true),
+    onUnnest: (container, zone) => this.handleNestChange(container, zone, false),
     onContainerPointerDown: (container) => {
       this.bringChainToFront(container.id);
     },
@@ -205,10 +173,8 @@ export class BlockEditorController {
   private rebuildScene(workspace: Workspace, containers: Container[]): void {
     this.containers = containers;
 
-    if (this.proximityFrameId) {
-      cancelAnimationFrame(this.proximityFrameId);
-      this.proximityFrameId = 0;
-    }
+    this.stopProximityLoop?.();
+    this.stopProximityLoop = null;
     this.stopConnectionSync?.();
     this.stopConnectionSync = null;
     this.stopSizeObservers?.();
@@ -229,8 +195,11 @@ export class BlockEditorController {
 
     const scene = buildSampleScene(workspace, this.containers);
     const registry = buildBlockRegistry(scene.created);
-    replaceMap(this.createdMap, registry.createdMap);
-    replaceMap(this.containerMap, registry.containerMap);
+
+    this.createdMap.clear();
+    for (const [k, v] of registry.createdMap) this.createdMap.set(k, v);
+    this.containerMap.clear();
+    for (const [k, v] of registry.containerMap) this.containerMap.set(k, v);
 
     registerSnapConnections(
       workspace,
@@ -266,23 +235,27 @@ export class BlockEditorController {
     seedInitialCBlockNest(scene.repeat1, [scene.moveInRepeat, scene.turnInRepeat]);
 
     this.syncRenderOrder();
-    this.stopConnectionSync = subscribeCBlockConnectionSync(
+    this.stopConnectionSync = subscribeCBlockConnectionSync({
       workspace,
-      this.containerMap,
-      this.cBlockRefs,
-      () => {
+      containerMap: this.containerMap,
+      cBlockRefs: this.cBlockRefs,
+      onBodyLayoutChange: () => {
         relayoutCreatedBlocks(Array.from(this.createdMap.values()));
         this.syncRenderOrder();
         this.bumpRevision();
       },
-    );
+    });
     this.stopSizeObservers = observeContainerContentSizes({
       items: scene.created,
       getContainer: (block) => block.container,
       resolveElement: (block) =>
         document.getElementById(`node-${block.state.id}`) as HTMLElement | null,
     });
-    this.startProximityLoop();
+    this.stopProximityLoop = startProximityLoop(
+      workspace,
+      this.activeBodyProximityIds,
+      () => collectBodyZoneProximityHits(this.bodyZoneMap, this.createdMap),
+    );
   }
 
   unmount(expectedWorkspace?: Workspace): void {
@@ -292,13 +265,11 @@ export class BlockEditorController {
 
     const workspace = this.workspace;
 
-    if (this.proximityFrameId) {
-      cancelAnimationFrame(this.proximityFrameId);
-      this.proximityFrameId = 0;
-    }
+    this.stopProximityLoop?.();
+    this.stopProximityLoop = null;
 
     if (workspace) {
-      syncBodyZoneProximityHighlights(
+      syncProximityHighlights(
         workspace,
         this.activeBodyProximityIds,
         new Map(),
@@ -337,25 +308,6 @@ export class BlockEditorController {
     this.workspace = null;
     this.containers = [];
     this.setBlocks([]);
-  }
-
-  private startProximityLoop(): void {
-    const tick = () => {
-      if (this.workspace) {
-        const nextHits = collectBodyZoneProximityHits(
-          this.bodyZoneMap,
-          this.createdMap,
-        );
-        syncBodyZoneProximityHighlights(
-          this.workspace,
-          this.activeBodyProximityIds,
-          nextHits,
-        );
-      }
-      this.proximityFrameId = requestAnimationFrame(tick);
-    };
-
-    this.proximityFrameId = requestAnimationFrame(tick);
   }
 
   private rebuildCBlockRefMap(): void {
@@ -418,7 +370,7 @@ export class BlockEditorController {
     inputIndex: number,
     containerId: string | null,
   ): void {
-    const key = slotKey(blockId, inputIndex);
+    const key = `${blockId}-${inputIndex}`;
     const current = this.snapshot.nestedSlots[key];
 
     if (containerId === null) {

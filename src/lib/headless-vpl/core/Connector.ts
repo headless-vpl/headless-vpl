@@ -1,7 +1,7 @@
 import type AutoLayout from './AutoLayout'
 import type Container from './Container'
 import { MovableObject } from './MovableObject'
-import Position, { type IPosition } from './Position'
+import Position, { type IPosition, type PositionLike, resolvePosition } from './Position'
 import type Workspace from './Workspace'
 
 export type ConnectorAnchorOrigin =
@@ -17,22 +17,31 @@ export type ConnectorAnchorOrigin =
 
 export type ConnectorAnchorTarget = 'parent' | string | Container | AutoLayout
 
+/** offset は { x, y } または [x, y] タプルを受け付ける */
+export type ConnectorAnchorOffset = { x?: number; y?: number } | [number, number]
+
 export type ConnectorAnchor = {
   target: ConnectorAnchorTarget
   origin?: ConnectorAnchorOrigin
-  offset?: {
-    x?: number
-    y?: number
-  }
+  offset?: ConnectorAnchorOffset
 }
 
 type ConnectorProps = {
   workspace?: Workspace
-  position?: Position
+  position?: PositionLike
   name: string
   type: 'input' | 'output'
   hitRadius?: number
   anchor?: ConnectorAnchor
+}
+
+/** ConnectorAnchorOffset を { x, y } に正規化する */
+export function resolveConnectorAnchorOffset(
+  offset?: ConnectorAnchorOffset
+): { x?: number; y?: number } | undefined {
+  if (!offset) return undefined
+  if (Array.isArray(offset)) return { x: offset[0], y: offset[1] }
+  return offset
 }
 
 class Connector extends MovableObject {
@@ -40,10 +49,11 @@ class Connector extends MovableObject {
   public anchor: ConnectorAnchor | null
 
   constructor({ workspace, position, name, type, hitRadius, anchor }: ConnectorProps) {
-    const initialPosition = position ?? new Position(0, 0)
+    const initialPosition = position ? resolvePosition(position) : new Position(0, 0)
     super(workspace, initialPosition, name, type)
     this.hitRadius = hitRadius ?? 12
-    this.anchor = anchor ?? null
+    // anchor.offset のタプル記法を正規化
+    this.anchor = anchor ? { ...anchor, offset: resolveConnectorAnchorOffset(anchor.offset) } : null
     if (this.workspace) {
       this.workspace.addElement(this)
     }
@@ -90,8 +100,9 @@ class Connector extends MovableObject {
     if (!target) return null
 
     const origin = this.anchor.origin ?? 'top-left'
-    const offsetX = this.anchor.offset?.x ?? 0
-    const offsetY = this.anchor.offset?.y ?? 0
+    const resolvedOffset = resolveConnectorAnchorOffset(this.anchor.offset)
+    const offsetX = resolvedOffset?.x ?? 0
+    const offsetY = resolvedOffset?.y ?? 0
     const bounds = this.getTargetBounds(target)
     const base = this.resolveOriginPoint(bounds, origin)
 
@@ -185,7 +196,7 @@ class Connector extends MovableObject {
   }
 
   public override toJSON(): Record<string, unknown> {
-    const offset = this.anchor?.offset
+    const offset = resolveConnectorAnchorOffset(this.anchor?.offset)
     return {
       ...super.toJSON(),
       connectorType: this.type,

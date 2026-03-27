@@ -1,5 +1,6 @@
 import type Container from './Container'
 import type Position from './Position'
+import { type PositionLike, resolvePosition } from './Position'
 import type Workspace from './Workspace'
 import { generateId } from './types'
 import type { IWorkspaceElement } from './types'
@@ -9,13 +10,13 @@ type AutoLayoutAlignment = 'start' | 'center' | 'end'
 
 type AutoLayoutProps = {
   workspace?: Workspace
-  position: Position
+  position: PositionLike
   width?: number
   height?: number
   direction?: AutoLayoutDirection
   gap?: number
   alignment?: AutoLayoutAlignment
-  containers: Container[]
+  containers?: Container[]
   minWidth?: number
   minHeight?: number
   resizesParent?: boolean
@@ -45,7 +46,7 @@ class AutoLayout implements IWorkspaceElement {
 
   constructor({
     workspace,
-    position,
+    position: positionInput,
     width,
     height,
     direction,
@@ -58,8 +59,8 @@ class AutoLayout implements IWorkspaceElement {
   }: AutoLayoutProps) {
     this.id = generateId('autolayout')
     if (workspace) this.workspace = workspace
-    this.Children = containers
-    this.position = position
+    this.Children = containers ?? []
+    this.position = resolvePosition(positionInput)
     this.width = width ?? 100
     this.height = height ?? 100
     this.direction = direction ?? 'horizontal'

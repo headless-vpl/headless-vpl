@@ -1,22 +1,23 @@
+// ブロック描画コンポーネント
 import type { Container } from '../../../lib/headless-vpl';
+import type {
+  BlockState,
+  CBlockRef,
+  CreatedBlock,
+  InputDef,
+} from './types';
 import {
-  type BlockState,
-  type CBlockRef,
-  type CreatedBlock,
-  type InputDef,
   C_BODY_MIN_H,
   C_FOOTER_H,
   C_HEADER_H,
   C_W,
   INLINE_SLOT_BASE_H,
-  REPORTER_H,
-  REPORTER_W,
-  STACK_W,
+  SHAPE_CONFIGS,
   getBlockSize,
   getInputValue,
   inputWidth,
   isCBlockShape,
-} from './defs';
+} from './blocks';
 
 function InlineToken({
   block,
@@ -55,59 +56,48 @@ function InlineToken({
     );
   }
 
-  switch (input.type) {
-    case 'number':
-      return (
-        <span className="scratch-slot-host" style={hostStyle}>
-          <input
-            type="text"
-            inputMode="numeric"
-            value={getInputValue(input, block, index)}
-            onChange={(event) =>
-              onInputValueChange?.(block.id, index, event.currentTarget.value)
-            }
-            style={{ width: slotWidth }}
-          />
-        </span>
-      );
-    case 'text':
-      return (
-        <span className="scratch-slot-host" style={hostStyle}>
-          <input
-            type="text"
-            value={getInputValue(input, block, index)}
-            onChange={(event) =>
-              onInputValueChange?.(block.id, index, event.currentTarget.value)
-            }
-            style={{ width: slotWidth }}
-          />
-        </span>
-      );
-    case 'dropdown':
-      return (
-        <span className="scratch-slot-host" style={hostStyle}>
-          <select
-            value={getInputValue(input, block, index)}
-            onChange={(event) =>
-              onInputValueChange?.(block.id, index, event.currentTarget.value)
-            }
-            style={{ width: slotWidth }}
-          >
-            {input.options.map((option) => (
-              <option key={option} value={option}>
-                {option}
-              </option>
-            ))}
-          </select>
-        </span>
-      );
-    case 'boolean-slot':
-      return (
-        <span className="scratch-slot-host scratch-slot-boolean" style={hostStyle}>
-          <span className="scratch-boolean-slot" />
-        </span>
-      );
+  if (input.type === 'number' || input.type === 'text') {
+    return (
+      <span className="scratch-slot-host" style={hostStyle}>
+        <input
+          type="text"
+          inputMode={input.type === 'number' ? 'numeric' : undefined}
+          value={getInputValue(input, block, index)}
+          onChange={(e) =>
+            onInputValueChange?.(block.id, index, e.currentTarget.value)
+          }
+          style={{ width: slotWidth }}
+        />
+      </span>
+    );
   }
+
+  if (input.type === 'dropdown') {
+    return (
+      <span className="scratch-slot-host" style={hostStyle}>
+        <select
+          value={getInputValue(input, block, index)}
+          onChange={(e) =>
+            onInputValueChange?.(block.id, index, e.currentTarget.value)
+          }
+          style={{ width: slotWidth }}
+        >
+          {input.options.map((option) => (
+            <option key={option} value={option}>
+              {option}
+            </option>
+          ))}
+        </select>
+      </span>
+    );
+  }
+
+  // boolean-slot
+  return (
+    <span className="scratch-slot-host scratch-slot-boolean" style={hostStyle}>
+      <span className="scratch-boolean-slot" />
+    </span>
+  );
 }
 
 export function BlockView({
@@ -131,6 +121,7 @@ export function BlockView({
   const bg = def.color;
   const ns = nestedSlots ?? {};
   const blockStyle = { zIndex };
+  const shape = SHAPE_CONFIGS[def.shape];
 
   const renderInputs = () =>
     def.inputs.map((input, index) => (
@@ -146,16 +137,15 @@ export function BlockView({
     ));
 
   if (def.shape === 'reporter' || def.shape === 'boolean') {
-    const className = def.shape === 'reporter' ? 'scratch-reporter' : 'scratch-boolean';
     return (
       <div
         id={`node-${block.id}`}
-        className={`scratch-block ${className}`}
+        className={`scratch-block scratch-${def.shape === 'boolean' ? 'boolean' : 'reporter'}`}
         style={{
           ...blockStyle,
           background: bg,
-          minWidth: REPORTER_W,
-          minHeight: container?.minHeight ?? REPORTER_H,
+          minWidth: shape.size.w,
+          minHeight: container?.minHeight ?? shape.size.h,
         }}
       >
         {def.name && <span>{def.name}</span>}
@@ -169,7 +159,7 @@ export function BlockView({
       <div
         id={`node-${block.id}`}
         className="scratch-block scratch-hat"
-        style={{ ...blockStyle, background: bg, minWidth: STACK_W }}
+        style={{ ...blockStyle, background: bg, minWidth: shape.size.w }}
       >
         {def.name && <span>{def.name}</span>}
         {renderInputs()}
@@ -225,7 +215,7 @@ export function BlockView({
     <div
       id={`node-${block.id}`}
       className="scratch-block scratch-stack"
-      style={{ ...blockStyle, background: bg, minWidth: STACK_W }}
+      style={{ ...blockStyle, background: bg, minWidth: shape.size.w }}
     >
       {def.name && <span>{def.name}</span>}
       {renderInputs()}

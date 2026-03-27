@@ -246,6 +246,55 @@ export function createSnapConnections<T>(config: CreateSnapConnectionsConfig<T>)
 }
 
 /**
+ * top/bottom connector パターン用のショートハンド。
+ * source は top connector を持つ側、target は bottom connector を持つ側。
+ * container と position は connector のオーナーから自動導出する。
+ */
+export type CreateStackSnapConnectionsConfig<T> = {
+  workspace: Workspace
+  items: readonly T[]
+  /** source 側（ドラッグされる側）の container を返す */
+  getContainer: (item: T) => Container
+  /** source 側の top connector を返す（null = スナップ不可） */
+  getTopConnector: (item: T) => { position: Position; hitRadius: number } | null | undefined
+  /** target 側の bottom connector を返す（null = スナップ不可） */
+  getBottomConnector: (item: T) => { position: Position; hitRadius: number } | null | undefined
+  canConnect?: (args: { source: T; target: T }) => boolean
+  strategy?: (args: { source: T; target: T }) => SnapStrategy | undefined
+  validator?: (args: { source: T; target: T }) => ConnectionValidator | undefined
+  priority?: number
+}
+
+export function createStackSnapConnections<T>(
+  config: CreateStackSnapConnectionsConfig<T>
+): SnapConnection[] {
+  return createSnapConnections({
+    workspace: config.workspace,
+    items: config.items,
+    sourceContainer: (item) => {
+      const conn = config.getTopConnector(item)
+      return conn ? config.getContainer(item) : null
+    },
+    sourcePosition: (item) => config.getTopConnector(item)?.position,
+    targetContainer: (item) => {
+      const conn = config.getBottomConnector(item)
+      return conn ? config.getContainer(item) : null
+    },
+    targetPosition: (item) => config.getBottomConnector(item)?.position,
+    canConnect: config.canConnect,
+    snapDistance: ({ source, target }) => {
+      const topConn = config.getTopConnector(source)
+      const bottomConn = config.getBottomConnector(target)
+      if (!topConn || !bottomConn) return undefined
+      return topConn.hitRadius + bottomConn.hitRadius
+    },
+    strategy: config.strategy,
+    validator: config.validator,
+    priority: () => config.priority,
+  })
+}
+
+/**
  * スナップ接続の状態管理を統合する helper。
  */
 export class SnapConnection {
